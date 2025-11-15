@@ -1,5 +1,5 @@
 // Name of the cache storage
-const CACHE_NAME = 'dram-tracker-cache-v4'; // Incremented cache name
+const CACHE_NAME = 'dram-tracker-cache-v5'; // Incremented cache name
 
 // List of all files the Service Worker should cache immediately
 const urlsToCache = [
@@ -8,7 +8,7 @@ const urlsToCache = [
     'icon-192.png', 
     'icon-512.png',
     // Important CDN assets
-    'https://cdn.tailwindcss.com',
+    // 'https://cdn.tailwindcss.com', // REMOVED to prevent CORS error
     'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js', 
     'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
     'https://unpkg.com/@babel/standalone/babel.min.js',
