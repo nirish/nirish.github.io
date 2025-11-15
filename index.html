@@ -5,29 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Dram Tracker PWA</title>
 
-    <!-- 1. PWA Manifest Link -->
-    <link rel="manifest" href="/manifest.json">
-    
-    <!-- 2. Apple Specific Tags for iOS Home Screen -->
+    <!-- 1. PWA Manifest & iOS Tags -->
+    <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Dram Tracker">
-
-    <!-- Theme Color for Browser/OS UI -->
     <meta name="theme-color" content="#065f46">
-    
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load React Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
-    <!-- Load Babel for JSX Transpilation -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Load Lucide Icons for React Components -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+    <link rel-="apple-touch-icon" href="icon-192.png">
 
-    <!-- Configure Tailwind to allow custom colors and Inter font -->
+    <!-- 2. Load Libraries (Global/UMD/Compat) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons (React UMD) -->
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+    <!-- Firebase (v8 Compat - Easiest for this setup) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore-compat.js"></script>
+
+    <!-- 3. Tailwind Config -->
     <script>
         tailwind.config = {
             theme: {
@@ -35,44 +34,45 @@
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                     },
-                    colors: {
-                        'emerald-800': '#065f46',
-                        'emerald-600': '#059669',
-                        'amber-500': '#f59e0b',
-                    }
                 }
             }
         }
     </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 font-sans">
+    
+    <!-- App root -->
     <div id="root"></div>
 
-    <!-- 3. Register Service Worker -->
+    <!-- 4. PWA Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(registration => {
-                        console.log('SW registered:', registration);
-                    })
-                    .catch(error => {
-                        console.error('SW registration failed:', error);
-                    });
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => console.log('SW registered:', registration))
+                    .catch(error => console.error('SW registration failed:', error));
             });
         }
     </script>
 
-    <!-- 4. Load Firebase Libraries (Need to be loaded before your React code uses them) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, query, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        
-        // Attach Firebase functions to the window object so your JSX component can access them.
-        window.firebase = { initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, getFirestore, doc, setDoc, collection, query, onSnapshot, getDocs, deleteDoc };
-        
-  const firebaseConfig = {
+    <!-- 5. The React Application -->
+    <script type="text/babel">
+// No more imports! We get everything from the 'window' object.
+const { useState, useEffect, useMemo, useCallback } = React;
+const { Wine, CalendarCheck, Zap, Goal, Flame, Calculator, ChevronDown, ChevronUp, Trash2, Minus, Plus } = LucideReact;
+
+// --- Global Constants ---
+const DAYS_IN_SABBATICAL = 107;
+const SABBATICAL_END_WEEK = 15;
+const TOTAL_TRACKING_WEEKS = 37;
+const DRINK_VOLUME_ML = 45;
+const BOTTLE_VOLUME_ML = 750;
+const DEFAULT_GOAL = 1.8;
+
+// --- Firebase Config (From your uploaded file) ---
+// We will use *your* hardcoded config object
+const firebaseConfig = {
     apiKey: "AIzaSyD92lDT-pbCB-EmtnTaEUhyql-CCYsLhho",
     authDomain: "dram-50c7c.firebaseapp.com",
     projectId: "dram-50c7c",
@@ -80,42 +80,21 @@
     messagingSenderId: "645616473221",
     appId: "1:645616473221:web:3a79dd9a2313f01bd0c5ec",
     measurementId: "G-VL3RYR0YRD"
-  };
-        window.__app_id = "your-app-id-if-needed";
-        window.__firebase_config = JSON.stringify({}); // Your actual config object goes here
-        window.__initial_auth_token = null; 
-    </script>
-    
-    <!-- 5. Load and Transpile Your React Component (DrinkTracker.jsx content goes here) -->
-    <script type="text/babel" data-type="module" data-presets="react" data-filename="/DrinkTracker.jsx">
-      import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, collection, query, onSnapshot, getDocs, deleteDoc } from 'firebase/firestore'; 
-import { Wine, CalendarCheck, Zap, Goal, Flame, Calculator, ChevronDown, ChevronUp, Trash2, Minus, Plus } from 'lucide-react'; 
+};
 
-// --- Global Constants & Firebase Setup ---
-// These variables are provided by the canvas environment.
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
+// --- Initialize Firebase (v8 Compat syntax) ---
+// This is different from the modular/v9+ syntax
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
+const auth = firebase.auth();
+const appId = "dram-50c7c"; // Your Project ID
 
-// The base constants for your tracking goals
-const DAYS_IN_SABBATICAL = 107; // Sabbatical runs up to and including this day of the year (Day 107).
-const SABBATICAL_END_WEEK = 15; // Week 1 to Week 15 is the sabbatical period (approximate based on DOY 107)
-const TOTAL_TRACKING_WEEKS = 37;
-const DRINK_VOLUME_ML = 45; // 1 dram/drink
-const BOTTLE_VOLUME_ML = 750;
-const DEFAULT_GOAL = 1.8;
-
-// Utility to ensure two decimal places
+// --- Utility Functions ---
 const round = (num) => Math.round(num * 100) / 100;
 
-// Calculates the Day of the Year (1-365/366) for a given date.
-// IMPORTANT: Uses UTC component getters to ignore local timezone offset (like PST) 
-// and ensure the DOY calculation matches the physical date selected.
 const getDayOfYear = (date) => {
-  // Use the UTC midnight date components for consistent DOY calculation
   const dateUTC = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const startOfYear = new Date(Date.UTC(dateUTC.getUTCFullYear(), 0, 1));
   const diff = dateUTC.getTime() - startOfYear.getTime();
@@ -123,54 +102,35 @@ const getDayOfYear = (date) => {
   return Math.floor(diff / oneDay) + 1;
 };
 
-// Calculates the chronological calendar week number (1-53) based on Day of Year.
 const getCalendarWeek = (date) => {
     const doy = getDayOfYear(date);
-    // Use Friday-Thursday week start, Week 1 starts with the week containing Jan 1
-    // This is a simple approximation; a more complex ISO week rule is often used
-    // but this suffices for consistent chronological numbering.
     return Math.min(Math.floor((doy - 1) / 7) + 1, 53); 
 };
 
-// Calculates the number of tracking weeks that have elapsed since the sabbatical ended, based on a specific date.
-// Tracking starts on Day 108 (approx Week 16). The elapsed weeks is simply the current week number minus the sabbatical end week.
 const getElapsedTrackingWeeks = (date) => {
   const doy = getDayOfYear(date);
-  if (doy <= DAYS_IN_SABBATICAL) return 0; // Sabbatical ends on DOY 107
-  
+  if (doy <= DAYS_IN_SABBATICAL) return 0;
   const currentWeek = getCalendarWeek(date);
-  // Weeks elapsed = Current Week Number - Sabbatical End Week
   const elapsedWeeks = currentWeek - SABBATICAL_END_WEEK;
-  
   return Math.max(1, Math.min(elapsedWeeks, TOTAL_TRACKING_WEEKS));
 };
 
-// Determines if a date falls within the sabbatical period
 const isSabbatical = (date) => getDayOfYear(date) <= DAYS_IN_SABBATICAL;
 
-// Date formatter for display
 const formatDate = (date) => date.toISOString().split('T')[0];
 
 // --- Main Logic Hook ---
 const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => { 
-    
-    // TODAY's date, fixed to midnight UTC.
     const today = useMemo(() => {
         const now = new Date();
         return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
     }, []);
     
-    // Find the latest date with *any* log after the sabbatical ended (Day 107).
-    // This is the true end date of the active logging period.
     const lastLogDateString = useMemo(() => {
         const loggedDates = Object.keys(dailyLog).sort();
         let latestDate = null;
-        
         for (const dateStr of loggedDates.reverse()) {
-            // IMPORTANT: Parse date as UTC
             const date = new Date(dateStr + 'T00:00:00Z');
-            
-            // We only care about logs *after* the sabbatical
             if (!isSabbatical(date)) {
                 latestDate = dateStr;
                 break;
@@ -179,77 +139,53 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
         return latestDate;
     }, [dailyLog]);
     
-    // The pacing reference date is the last date logged (or today if no post-sabbatical logs)
     const pacingReferenceDate = useMemo(() => {
         if (lastLogDateString) {
-            // Use the last log date (including 0 drinks) to calculate elapsed weeks for accurate pacing
             return new Date(lastLogDateString + 'T00:00:00Z'); 
         }
-        // If no post-sabbatical logs, use today to get correct elapsed weeks (will be 0 if still in sabbatical).
         return today; 
     }, [lastLogDateString, today]);
     
-    // Calculate elapsed weeks based on the pacing reference date
     const elapsedTrackingWeeks = useMemo(() => getElapsedTrackingWeeks(pacingReferenceDate), [pacingReferenceDate]);
 
-    
     const metrics = useMemo(() => {
         let totalDrinksConsumed = 0;
         let sabbaticalExceptions = 0;
         let trackingPeriodDrinks = 0;
 
-        // Calculate total annual goal based on the current editable value
         const totalGoalDrinksFloat = goalDrinksPerWeek * TOTAL_TRACKING_WEEKS;
         const totalGoalBottlesFloat = (totalGoalDrinksFloat * DRINK_VOLUME_ML) / BOTTLE_VOLUME_ML;
         
-        // Use Math.round for display values
         const totalGoalDrinks = Math.round(totalGoalDrinksFloat);
         const totalGoalBottles = Math.round(totalGoalBottlesFloat);
         
-        
-        // Calculate total consumption and exceptions
         Object.values(dailyLog).forEach(entry => {
             totalDrinksConsumed += entry.drinks;
-            
-            // IMPORTANT: Parse date as UTC to ensure getDayOfYear is accurate
             const date = new Date(entry.date + 'T00:00:00Z'); 
-            
             if (isSabbatical(date) && entry.drinks > 0) {
                 sabbaticalExceptions += entry.drinks;
             }
-            
-            // Sum drinks only if outside the sabbatical period
             if (!isSabbatical(date)) {
                 trackingPeriodDrinks += entry.drinks;
             }
         });
         
-        
-        // Goal Calculation: What should the consumption be *up to this point* based on elapsed time?
         const targetConsumedToDate = elapsedTrackingWeeks * goalDrinksPerWeek;
 
-        // --- Pacing Calculation ---
         let pacingAvgPerWeek = 0;
         let totalProjectedDrinks = 0;
         let bottlesProjected = 0;
 
         if (elapsedTrackingWeeks > 0) {
-            // Pacing: Average per week (based on elapsed weeks up to the LAST LOG DATE, including 0 logs)
             pacingAvgPerWeek = round(trackingPeriodDrinks / elapsedTrackingWeeks);
-
-            // Total Projected Drinks for the full 37-week tracking period (BASED ON PACING AVG)
             totalProjectedDrinks = pacingAvgPerWeek * TOTAL_TRACKING_WEEKS;
-            
-            // Bottles Drank Projected (Based on current average * over the full tracking period)
             bottlesProjected = round((totalProjectedDrinks * DRINK_VOLUME_ML) / BOTTLE_VOLUME_ML);
         }
 
-        // % of Goal (ANNUAL COUNTDOWN: Actual consumed vs. Total Annual Goal)
         const percentOfGoal = totalGoalDrinks > 0 
             ? round((trackingPeriodDrinks / totalGoalDrinks) * 100)
             : (trackingPeriodDrinks > 0 ? 100 : 0); 
         
-        // Drinks on Reserve (Countdown to Annual Goal)
         const drinksReserve = totalGoalDrinks - trackingPeriodDrinks;
         
         return {
@@ -260,42 +196,27 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
             pacingAvgPerWeek,
             bottlesProjected,
             percentOfGoal,
-            drinksOnReserve: Math.round(drinksReserve), // ROUNDED TO WHOLE
-            projectedAnnualDrinks: Math.round(totalProjectedDrinks), // ROUNDED TO WHOLE
+            drinksOnReserve: Math.round(drinksReserve),
+            projectedAnnualDrinks: Math.round(totalProjectedDrinks),
             sabbaticalExceptions,
             trackingPeriodDrinks,
             targetConsumedToDate: round(targetConsumedToDate)
         };
-        
     }, [dailyLog, elapsedTrackingWeeks, goalDrinksPerWeek, lastLogDateString]); 
     
     return metrics;
 };
 
-
-// --- FIREBASE AND AUTHENTICATION ---
-let firebaseApp, db, auth;
-if (Object.keys(firebaseConfig).length > 0) {
-    try {
-        firebaseApp = initializeApp(firebaseConfig);
-        db = getFirestore(firebaseApp);
-        auth = getAuth(firebaseApp);
-    } catch (e) {
-        console.error("Firebase initialization failed:", e);
-    }
-}
-
+// --- Main App Component ---
+// Note: We are using the global `db` and `auth` variables initialized above.
 function App() {
     const [userId, setUserId] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [loading, setLoading] = useState(true);
     const [dailyLog, setDailyLog] = useState({});
     
-    // State for the editable goal value (saved in Firestore)
     const [goalDrinksPerWeek, setGoalDrinksPerWeek] = useState(DEFAULT_GOAL); 
-    // State for the input field (used for editing before saving)
     const [tempGoalInput, setTempGoalInput] = useState(DEFAULT_GOAL); 
-    // State for the collapse status
     const [isGoalCollapsed, setIsGoalCollapsed] = useState(true); 
 
     const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
@@ -303,32 +224,22 @@ function App() {
 
     // 1. Firebase Authentication & Setup
     useEffect(() => {
-        if (!auth) {
-             console.error("Firebase Auth not available.");
-             setLoading(false);
-             return;
-        }
-
         const setupAuth = async () => {
             try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // Use v8 compat syntax
+                await auth.signInAnonymously();
             } catch (error) {
                 console.error("Auth error:", error);
             }
         };
 
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
             if (user) {
                 setUserId(user.uid);
             } else {
-                setUserId(null); // Should not happen after setupAuth, but safety check
+                setUserId(null);
             }
             setIsAuthReady(true);
-            // NOTE: set loading false is moved to the goal listener to ensure goal is loaded
         });
 
         setupAuth();
@@ -337,50 +248,45 @@ function App() {
 
     // 2. Firestore Listener for Goal Settings
     useEffect(() => {
-        if (!isAuthReady || !userId || !db) return;
-
-        const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/settings/goals`);
+        if (!isAuthReady || !userId) return;
         
-        const unsubscribe = onSnapshot(goalDocRef, (docSnapshot) => {
-            if (docSnapshot.exists()) {
+        // Use v8 compat syntax
+        const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
+        
+        const unsubscribe = goalDocRef.onSnapshot((docSnapshot) => {
+            if (docSnapshot.exists) {
                 const data = docSnapshot.data();
-                // Ensure goal is a valid number, default to 1.8 if missing or invalid
                 const newGoal = parseFloat(data.goalDrinksPerWeek) || DEFAULT_GOAL; 
                 setGoalDrinksPerWeek(newGoal);
-                setTempGoalInput(newGoal); // Keep input field synced with saved goal
+                setTempGoalInput(newGoal);
             } else {
-                // If document doesn't exist, ensure defaults are set
                 setGoalDrinksPerWeek(DEFAULT_GOAL);
                 setTempGoalInput(DEFAULT_GOAL);
             }
-            // Now that auth and goal is loaded, we can set loading to false
             setLoading(false);
         }, (error) => {
             console.error("Error listening to goals:", error);
-            setLoading(false); // Stop loading even on error
+            setLoading(false);
         });
 
         return () => unsubscribe();
     }, [isAuthReady, userId]);
 
-
     // 3. Firestore Listener for Daily Log
     useEffect(() => {
-        if (!isAuthReady || !userId || !db) return;
+        if (!isAuthReady || !userId) return;
 
-        const logCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/drink_tracker`);
+        // Use v8 compat syntax
+        const logCollectionRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`);
         
-        const q = query(logCollectionRef);
-        
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const unsubscribe = logCollectionRef.onSnapshot((snapshot) => {
             const newLog = {};
             snapshot.forEach((doc) => {
                 const data = doc.data();
-                newLog[data.date] = data; // Key by date for easy lookup
+                newLog[data.date] = data;
             });
             setDailyLog(newLog);
             
-            // Re-sync current input if the log for the selected date was just updated
             const logEntry = newLog[selectedDate];
             if (logEntry) {
                 setCurrentDrinks(logEntry.drinks);
@@ -394,108 +300,73 @@ function App() {
         return () => unsubscribe();
     }, [isAuthReady, userId, selectedDate]);
 
-    // Update currentDrinks when selectedDate changes (to reflect past logs)
+    // Update currentDrinks when selectedDate changes
     useEffect(() => {
         const logEntry = dailyLog[selectedDate];
         setCurrentDrinks(logEntry ? logEntry.drinks : 0);
     }, [selectedDate, dailyLog]);
     
-    // --- Data Processing ---
-    // Pass the goal to the hook
     const metrics = useTrackerMetrics(dailyLog, goalDrinksPerWeek); 
 
     // --- Actions ---
-    const handleDateChange = (e) => {
-        setSelectedDate(e.target.value);
-    };
-
-    const handleIncrement = () => {
-        setCurrentDrinks(prev => prev + 1);
-    };
-
-    const handleDecrement = () => {
-        setCurrentDrinks(prev => Math.max(0, prev - 1));
-    };
+    const handleDateChange = (e) => setSelectedDate(e.target.value);
+    const handleIncrement = () => setCurrentDrinks(prev => prev + 1);
+    const handleDecrement = () => setCurrentDrinks(prev => Math.max(0, prev - 1));
 
     const handleSaveLog = useCallback(async () => {
-        if (!userId || !db) {
-            console.error("App not ready or DB not available.");
-            return;
-        }
-
-        const date = selectedDate;
-        const drinks = currentDrinks;
-        
-        // setDoc with date as the document ID ensures an OVERWRITE/EDIT, not an add.
-        const docRef = doc(db, `artifacts/${appId}/users/${userId}/drink_tracker/${date}`);
-        
+        if (!userId) return;
+        // Use v8 compat syntax
+        const docRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`).doc(selectedDate);
         try {
-            await setDoc(docRef, {
-                date: date,
-                drinks: drinks,
-                timestamp: new Date(), // For tracking last modified
-            }, { merge: true }); // Use merge true to prevent overwriting other fields in the future
-            console.log("Log saved/edited successfully for:", date);
+            await docRef.set({
+                date: selectedDate,
+                drinks: currentDrinks,
+                timestamp: new Date(),
+            }, { merge: true });
+            console.log("Log saved/edited successfully for:", selectedDate);
         } catch (e) {
             console.error("Error adding document: ", e);
         }
-    }, [userId, db, selectedDate, currentDrinks]);
+    }, [userId, selectedDate, currentDrinks]);
 
     const handleSaveGoal = useCallback(async () => {
-        if (!userId || !db) {
-            console.error("App not ready or DB not available.");
-            return;
-        }
-
+        if (!userId) return;
         const newGoal = parseFloat(tempGoalInput);
-        if (isNaN(newGoal) || newGoal < 0) {
-             console.error("Invalid goal input. Must be a non-negative number.");
-             // In a real app, show a UI error message here
-             return;
-        }
+        if (isNaN(newGoal) || newGoal < 0) return;
 
-        const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/settings/goals`);
-        
+        // Use v8 compat syntax
+        const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
         try {
-            await setDoc(goalDocRef, {
-                goalDrinksPerWeek: round(newGoal), // Save rounded value
+            await goalDocRef.set({
+                goalDrinksPerWeek: round(newGoal),
                 lastUpdated: new Date(),
             }, { merge: true });
             console.log("Goal saved successfully:", round(newGoal));
-            setIsGoalCollapsed(true); // Collapse after saving
+            setIsGoalCollapsed(true);
         } catch (e) {
             console.error("Error saving goal: ", e);
         }
-    }, [userId, db, tempGoalInput]);
+    }, [userId, tempGoalInput]);
     
-    // New function to handle data reset (requires getDocs and deleteDoc imports)
     const handleResetData = useCallback(async () => {
-        if (!userId || !db) {
-            console.error("App not ready or DB not available.");
-            return;
-        }
-
-        // 1. Confirm reset (using console log instead of alert/confirm)
+        if (!userId) return;
         console.warn("Attempting to RESET ALL DATA.");
         
-        // 2. Delete all documents in the 'drink_tracker' collection
-        const logCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/drink_tracker`);
+        // Use v8 compat syntax
+        const logCollectionRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`);
         try {
-            const snapshot = await getDocs(logCollectionRef);
-            const deletePromises = [];
-            snapshot.docs.forEach(docSnapshot => {
-                deletePromises.push(deleteDoc(doc(db, logCollectionRef.path, docSnapshot.id)));
-            });
-            await Promise.all(deletePromises);
+            const snapshot = await logCollectionRef.get();
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
             console.log("Successfully deleted all drink log documents.");
         } catch (e) {
             console.error("Error deleting documents:", e);
         }
 
-        // 3. Reset the goal setting to default
-        const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/settings/goals`);
+        const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
         try {
-            await setDoc(goalDocRef, {
+            await goalDocRef.set({
                 goalDrinksPerWeek: DEFAULT_GOAL,
                 lastUpdated: new Date(),
             });
@@ -503,11 +374,9 @@ function App() {
         } catch (e) {
             console.error("Error resetting goal:", e);
         }
-    }, [userId, db]);
-
+    }, [userId]);
 
     // --- UI Components ---
-    
     const MetricCard = ({ title, value, unit, icon: Icon, colorClass = 'bg-gray-100' }) => (
         <div className={`p-3 rounded-xl shadow-lg flex flex-col items-center justify-center ${colorClass} text-gray-800 transition duration-300 transform hover:scale-[1.02] border border-opacity-20`}>
             <div className="flex items-center space-x-1 mb-1">
@@ -521,16 +390,13 @@ function App() {
         </div>
     );
     
-    // Custom component for the Drinks on Reserve pill
     const ReservePill = ({ value, unit }) => {
         const isOver = value < 0;
         const sign = value > 0 ? '+' : (value < 0 ? '' : '');
-        // Round to whole number here for display
         const absoluteValue = Math.abs(Math.round(value)); 
-        
         const colorClass = isOver 
-            ? 'bg-red-700 text-white shadow-lg shadow-red-400' // Dark Red for Over
-            : 'bg-emerald-600 text-white shadow-lg shadow-emerald-400'; // Dark Green for Remaining
+            ? 'bg-red-700 text-white shadow-lg shadow-red-400'
+            : 'bg-emerald-600 text-white shadow-lg shadow-emerald-400';
 
         return (
             <div className={`p-2 rounded-xl flex flex-col items-center justify-center h-full w-full transition duration-300 ${colorClass}`}>
@@ -551,28 +417,19 @@ function App() {
         );
     }
     
-    // IMPORTANT: Create currentDay forcing UTC interpretation to ensure accurate DOY
     const currentDay = new Date(selectedDate + 'T00:00:00Z');
     const isTodaySabbatical = isSabbatical(currentDay);
 
-    // Helper function to structure weekly data (Friday to Thursday)
     const getWeeklyData = () => {
         const weeks = {};
         const dates = Object.keys(dailyLog).sort();
-
         dates.forEach(dateStr => {
-            // IMPORTANT: Force UTC interpretation
             const date = new Date(dateStr + 'T00:00:00Z'); 
-            
-            // Find the start of the week (Friday)
-            let currentDayOfWeek = date.getUTCDay(); // 0=Sunday, 5=Friday, 6=Saturday
+            let currentDayOfWeek = date.getUTCDay();
             let daysToFriday = currentDayOfWeek <= 4 ? currentDayOfWeek + 2 : currentDayOfWeek - 5;
-            
             const fridayDate = new Date(date);
             fridayDate.setUTCDate(date.getUTCDate() - daysToFriday);
-            
-            const weekKey = formatDate(fridayDate); // Use Friday's date as the week key (YYYY-MM-DD)
-            
+            const weekKey = formatDate(fridayDate);
             const calendarWeek = getCalendarWeek(date);
 
             if (!weeks[weekKey]) {
@@ -580,8 +437,7 @@ function App() {
                     startDate: fridayDate,
                     totalDrinks: 0,
                     days: {},
-                    calendarWeekNumber: calendarWeek, // Continuous week number 1-53
-                    // Determine status based on the first logged date in that week
+                    calendarWeekNumber: calendarWeek,
                     isSabbatical: isSabbatical(date) 
                 };
             }
@@ -590,24 +446,14 @@ function App() {
             weeks[weekKey].totalDrinks += logEntry.drinks;
             weeks[weekKey].days[dateStr] = logEntry.drinks;
         });
-
         return weeks;
     };
     
     const weeklyData = getWeeklyData();
     const sortedWeeks = Object.keys(weeklyData).sort().reverse();
     
-    
     return (
-        <div className="min-h-screen bg-gray-50 font-sans p-4 max-w-lg mx-auto">
-            <script src="https://cdn.tailwindcss.com"></script>
-            <style>
-                {`
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-                .font-sans { font-family: 'Inter', sans-serif; }
-                `}
-            </style>
-
+        <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
             <header className="py-4 mb-6 border-b border-amber-300">
                 <h1 className="text-2xl font-extrabold text-emerald-800 flex items-center">
                     <Flame className="w-6 h-6 mr-2 text-amber-500" />
@@ -616,12 +462,8 @@ function App() {
                 <p className="text-sm text-gray-500 mt-1">
                     Tracking Goal: **{goalDrinksPerWeek.toFixed(2)} drinks/week** ({metrics.totalGoalDrinks} annual drinks).
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                    User ID: {userId}
-                </p>
             </header>
             
-            {/* GOAL EDITING SECTION */}
             <section className="mb-8 p-4 bg-emerald-50 rounded-xl shadow-inner border border-emerald-200">
                 <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsGoalCollapsed(!isGoalCollapsed)}>
                     <h2 className="text-lg font-bold text-emerald-800 flex items-center">
@@ -651,7 +493,6 @@ function App() {
                                 Update Goal
                             </button>
                         </div>
-                        
                          <div className="mt-6">
                             <button
                                 onClick={handleResetData}
@@ -668,7 +509,6 @@ function App() {
                 )}
             </section>
             
-            {/* Goal Metric Boxes */}
             <section className="mb-8">
                 <h2 className="text-xl font-bold mb-4 text-emerald-800">Annual Goals</h2>
                 <div className="grid grid-cols-3 gap-3">
@@ -693,7 +533,6 @@ function App() {
                 </div>
             </section>
 
-            {/* Sabbatical Status */}
             {isTodaySabbatical && (
                 <div className="mb-6 p-3 bg-amber-50 border-l-4 border-amber-500 rounded-xl shadow-sm">
                     <p className="font-bold text-amber-700">Sabbatical Period Active (Wk {getCalendarWeek(currentDay)})</p>
@@ -701,11 +540,8 @@ function App() {
                 </div>
             )}
 
-
-            {/* 1. Daily Input */}
             <section className="mb-8 p-4 bg-white rounded-xl shadow-xl">
                 <h2 className="text-lg font-bold mb-4 text-emerald-800">Log Daily Consumption (1 Drink = 1 Dram)</h2>
-                
                 <div className="grid grid-cols-2 gap-4 items-end">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
@@ -714,11 +550,9 @@ function App() {
                             value={selectedDate}
                             onChange={handleDateChange}
                             className="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
-                            max={formatDate(new Date())} // Cannot log future dates
+                            max={formatDate(new Date())}
                         />
                     </div>
-                    
-                    {/* Dram Input with Buttons */}
                     <div className="text-center">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Drams/Drinks Consumed</label>
                         <div className="flex justify-between items-center space-x-2">
@@ -730,13 +564,11 @@ function App() {
                             >
                                 <Minus className="w-5 h-5" />
                             </button>
-
                             <div className="flex-grow text-center">
                                 <span className="text-4xl font-extrabold text-emerald-800 tabular-nums">
                                     {currentDrinks}
                                 </span>
                             </div>
-
                             <button
                                 onClick={handleIncrement}
                                 className="p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-md transition duration-150 active:bg-emerald-700"
@@ -747,7 +579,6 @@ function App() {
                         </div>
                     </div>
                 </div>
-                
                 <button
                     onClick={handleSaveLog}
                     className="mt-5 w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold text-lg shadow-lg hover:bg-emerald-700 transition duration-150 transform hover:scale-[1.01]"
@@ -756,13 +587,10 @@ function App() {
                 </button>
             </section>
             
-            {/* 2. Pacing Metrics (Redesigned) */}
             <section className="mb-8">
                 <h2 className="text-xl font-bold mb-4 text-emerald-800">
                     Pacing Metrics
                 </h2>
-                
-                {/* Row 1: 3 Pacing Boxes */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
                     <MetricCard
                         title="Avg / Week"
@@ -781,16 +609,11 @@ function App() {
                     <MetricCard
                         title="Total Consumed"
                         value={metrics.trackingPeriodDrinks}
-                        unit=""
                         icon={CalendarCheck}
                         colorClass="bg-gray-100"
                     />
                 </div>
-                
-                {/* Row 2: Progress Bar & Reserve */}
                 <div className="flex space-x-4 h-24">
-                    
-                    {/* Progress Bar (3/4 width) */}
                     <div className="w-3/4 bg-white rounded-xl shadow-xl p-4 flex flex-col justify-center border border-gray-200">
                         <div className="flex justify-between items-center mb-1">
                             <h3 className="text-sm font-bold text-gray-700">Goal Progress (Annual Countdown)</h3>
@@ -808,8 +631,6 @@ function App() {
                             Consumed: {metrics.trackingPeriodDrinks} / {metrics.totalGoalDrinks} drinks
                         </p>
                     </div>
-
-                    {/* Reserve Number (1/4 width) */}
                     <div className="w-1/4">
                         <ReservePill 
                             value={metrics.drinksOnReserve} 
@@ -817,7 +638,6 @@ function App() {
                         />
                     </div>
                 </div>
-                
                 {metrics.sabbaticalExceptions > 0 && (
                      <div className="mt-4 p-3 bg-amber-50 border-l-4 border-amber-500 rounded-xl shadow-sm">
                         <p className="font-bold text-amber-700">Sabbatical Exceptions: {metrics.sabbaticalExceptions} Drinks</p>
@@ -826,12 +646,10 @@ function App() {
                 )}
             </section>
             
-            {/* 4. Weekly Log Table */}
             <section className="mb-8">
                 <h2 className="text-xl font-bold mb-4 text-emerald-800">Weekly Log (Friday-Thursday)</h2>
-                
                 <div className="overflow-x-auto bg-white rounded-xl shadow-xl">
-                    <table className="min-w-full divide-y divide-gray-20S00">
+                    <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Week #</th>
@@ -844,18 +662,14 @@ function App() {
                             {sortedWeeks.length === 0 ? (
                                 <tr>
                                     <td colSpan="4" className="p-4 text-center text-gray-500 italic">No logs found yet.</td>
-                                
                                 </tr>
                             ) : (
                                 sortedWeeks.map((weekKey) => {
                                     const week = weeklyData[weekKey];
                                     const endDate = new Date(week.startDate);
-                                    endDate.setUTCDate(week.startDate.getUTCDate() + 6); // Use UTC date setting
-                                    
+                                    endDate.setUTCDate(week.startDate.getUTCDate() + 6);
                                     const isOver = week.totalDrinks > goalDrinksPerWeek;
-                                    
                                     const isCurrentWeek = getCalendarWeek(new Date()) === week.calendarWeekNumber;
-                                    
                                     const weekLabel = week.isSabbatical 
                                         ? `Sabbatical Wk ${week.calendarWeekNumber}` 
                                         : `Wk ${week.calendarWeekNumber}`;
@@ -890,19 +704,13 @@ function App() {
                     </table>
                 </div>
             </section>
-
         </div>
     );
 }
 
-export default App;
-    </script>
-
-    <!-- 6. Mount the App -->
-    <script type="text/babel">
-        import App from "/DrinkTracker.jsx";
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+// --- Mount the App ---
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
     </script>
 </body>
 </html>
