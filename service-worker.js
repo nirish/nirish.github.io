@@ -1,5 +1,5 @@
 // Name of the cache storage
-const CACHE_NAME = 'dram-tracker-cache-v3'; // Incremented cache name
+const CACHE_NAME = 'dram-tracker-cache-v4'; // Incremented cache name
 
 // List of all files the Service Worker should cache immediately
 const urlsToCache = [
@@ -13,10 +13,10 @@ const urlsToCache = [
     'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
     'https://unpkg.com/@babel/standalone/babel.min.js',
     'https://unpkg.com/lucide@latest/dist/umd/lucide.js', // Core lucide
-    // Firebase v8 Compat scripts
-    'https://www.gstatic.com/firebasejs/8.10.1/firebase-app-compat.js',
-    'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth-compat.js',
-    'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore-compat.js'
+    // Firebase v8 - CORRECTED URLs
+    'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',
+    'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js',
+    'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js'
 ];
 
 // --- INSTALL EVENT ---
