@@ -1,24 +1,27 @@
 // Name of the cache storage
-const CACHE_NAME = 'dram-tracker-cache-v1';
+const CACHE_NAME = 'dram-tracker-cache-v2'; // Incremented cache name
 
 // List of all files the Service Worker should cache immediately
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/manifest.json',
-    'icon-192.png', // You'll need to create these image files
+    'index.html', // Cache the main HTML file
+    'manifest.json',
+    'icon-192.png', 
     'icon-512.png',
-    // Important CDN assets needed for the app to run offline
+    // Important CDN assets
     'https://cdn.tailwindcss.com',
-    'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js', // Use production version for better speed
+    'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js', 
     'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
     'https://unpkg.com/@babel/standalone/babel.min.js',
-    'https://unpkg.com/lucide@latest',
     'https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js',
+    // NEW: Firebase v8 Compat scripts
+    'https://www.gstatic.com/firebasejs/8.10.1/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore-compat.js'
 ];
 
 // --- INSTALL EVENT ---
 self.addEventListener('install', (event) => {
+    self.skipWaiting(); // Force the new service worker to activate
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -33,33 +36,43 @@ self.addEventListener('install', (event) => {
 
 // --- FETCH EVENT ---
 self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        caches.match(event.request)
-            .then((response) => {
-                if (response) {
-                    return response; // Cache hit
-                }
-                
-                return fetch(event.request).then(
-                    (response) => {
-                        // Skip caching Firebase transactions or large external data
-                        if (!response || response.status !== 200 || response.type !== 'basic' || 
-                            event.request.url.includes('firebase') || event.request.url.includes('googleapis')) {
+    // For navigation requests (like loading the page), always go to the network first
+    // This ensures you get the latest HTML, but fall back to cache if offline.
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    // Good response? Clone it and cache it.
+                    if (response.ok) {
+                        const resClone = response.clone();
+                        caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+                    }
+                    return response;
+                })
+                .catch(() => caches.match(event.request).then(response => response || caches.match('index.html')))
+        );
+    } else {
+        // For all other requests (scripts, images), use cache-first
+        event.respondWith(
+            caches.match(event.request)
+                .then((response) => {
+                    if (response) {
+                        return response; // Cache hit
+                    }
+                    // Not in cache? Go to network.
+                    return fetch(event.request).then(
+                        (response) => {
+                            if (!response || response.status !== 200 || response.type !== 'basic') {
+                                return response;
+                            }
+                            const responseToCache = response.clone();
+                            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
                             return response;
                         }
-
-                        const responseToCache = response.clone();
-                        
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
-                                cache.put(event.request, responseToCache);
-                            });
-
-                        return response;
-                    }
-                );
-            })
-    );
+                    );
+                })
+        );
+    }
 });
 
 // --- ACTIVATE EVENT ---
@@ -70,10 +83,10 @@ self.addEventListener('activate', (event) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
                     if (cacheWhitelist.indexOf(cacheName) === -1) {
-                        return caches.delete(cacheName);
+                        return caches.delete(cacheName); // Delete old caches
                     }
                 })
             );
-        })
+        }).then(() => self.clients.claim()) // Take control of open pages
     );
 });
