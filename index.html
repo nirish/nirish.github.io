@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Dram Tracker">
     <meta name="theme-color" content="#065f46">
-    <link rel-="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
 
     <!-- 2. Load Libraries (Global/UMD/Compat) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,9 +19,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons (React UMD) -->
-    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
-    <!-- Firebase (v8 Compat - Easiest for this setup) -->
+    
+    <!-- Lucide Icons (CORE UMD - More stable) -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <!-- Firebase (v8 Compat - Stable URLs) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore-compat.js"></script>
@@ -39,6 +41,15 @@
         }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        /* Lucide icons default size */
+        .lucide {
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+            vertical-align: middle;
+        }
+    </style>
 </head>
 <body class="bg-gray-50 font-sans">
     
@@ -58,9 +69,9 @@
 
     <!-- 5. The React Application -->
     <script type="text/babel">
-// No more imports! We get everything from the 'window' object.
-const { useState, useEffect, useMemo, useCallback } = React;
-const { Wine, CalendarCheck, Zap, Goal, Flame, Calculator, ChevronDown, ChevronUp, Trash2, Minus, Plus } = LucideReact;
+// Get React functions from the window
+const { useState, useEffect, useMemo, useCallback, Fragment } = React;
+// We no longer get icons from LucideReact, we will call a function instead.
 
 // --- Global Constants ---
 const DAYS_IN_SABBATICAL = 107;
@@ -70,8 +81,7 @@ const DRINK_VOLUME_ML = 45;
 const BOTTLE_VOLUME_ML = 750;
 const DEFAULT_GOAL = 1.8;
 
-// --- Firebase Config (From your uploaded file) ---
-// We will use *your* hardcoded config object
+// --- Firebase Config (From your verified file) ---
 const firebaseConfig = {
     apiKey: "AIzaSyD92lDT-pbCB-EmtnTaEUhyql-CCYsLhho",
     authDomain: "dram-50c7c.firebaseapp.com",
@@ -83,7 +93,7 @@ const firebaseConfig = {
 };
 
 // --- Initialize Firebase (v8 Compat syntax) ---
-// This is different from the modular/v9+ syntax
+// We get 'firebase' from the script loaded in the <head>
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
@@ -208,7 +218,6 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
 };
 
 // --- Main App Component ---
-// Note: We are using the global `db` and `auth` variables initialized above.
 function App() {
     const [userId, setUserId] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
@@ -226,7 +235,6 @@ function App() {
     useEffect(() => {
         const setupAuth = async () => {
             try {
-                // Use v8 compat syntax
                 await auth.signInAnonymously();
             } catch (error) {
                 console.error("Auth error:", error);
@@ -249,10 +257,7 @@ function App() {
     // 2. Firestore Listener for Goal Settings
     useEffect(() => {
         if (!isAuthReady || !userId) return;
-        
-        // Use v8 compat syntax
         const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
-        
         const unsubscribe = goalDocRef.onSnapshot((docSnapshot) => {
             if (docSnapshot.exists) {
                 const data = docSnapshot.data();
@@ -268,17 +273,13 @@ function App() {
             console.error("Error listening to goals:", error);
             setLoading(false);
         });
-
         return () => unsubscribe();
     }, [isAuthReady, userId]);
 
     // 3. Firestore Listener for Daily Log
     useEffect(() => {
         if (!isAuthReady || !userId) return;
-
-        // Use v8 compat syntax
         const logCollectionRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`);
-        
         const unsubscribe = logCollectionRef.onSnapshot((snapshot) => {
             const newLog = {};
             snapshot.forEach((doc) => {
@@ -286,7 +287,6 @@ function App() {
                 newLog[data.date] = data;
             });
             setDailyLog(newLog);
-            
             const logEntry = newLog[selectedDate];
             if (logEntry) {
                 setCurrentDrinks(logEntry.drinks);
@@ -296,7 +296,6 @@ function App() {
         }, (error) => {
             console.error("Error listening to log:", error);
         });
-
         return () => unsubscribe();
     }, [isAuthReady, userId, selectedDate]);
 
@@ -305,6 +304,15 @@ function App() {
         const logEntry = dailyLog[selectedDate];
         setCurrentDrinks(logEntry ? logEntry.drinks : 0);
     }, [selectedDate, dailyLog]);
+    
+    // NEW: Icon Rendering Effect
+    // This runs after every render to find all `data-lucide` attributes
+    // and replace them with SVG icons. This is the stable fix.
+    useEffect(() => {
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    }, [loading, isGoalCollapsed, metrics]); // Re-run when state changes
     
     const metrics = useTrackerMetrics(dailyLog, goalDrinksPerWeek); 
 
@@ -315,7 +323,6 @@ function App() {
 
     const handleSaveLog = useCallback(async () => {
         if (!userId) return;
-        // Use v8 compat syntax
         const docRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`).doc(selectedDate);
         try {
             await docRef.set({
@@ -333,8 +340,6 @@ function App() {
         if (!userId) return;
         const newGoal = parseFloat(tempGoalInput);
         if (isNaN(newGoal) || newGoal < 0) return;
-
-        // Use v8 compat syntax
         const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
         try {
             await goalDocRef.set({
@@ -351,8 +356,6 @@ function App() {
     const handleResetData = useCallback(async () => {
         if (!userId) return;
         console.warn("Attempting to RESET ALL DATA.");
-        
-        // Use v8 compat syntax
         const logCollectionRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`);
         try {
             const snapshot = await logCollectionRef.get();
@@ -363,7 +366,6 @@ function App() {
         } catch (e) {
             console.error("Error deleting documents:", e);
         }
-
         const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
         try {
             await goalDocRef.set({
@@ -377,10 +379,11 @@ function App() {
     }, [userId]);
 
     // --- UI Components ---
-    const MetricCard = ({ title, value, unit, icon: Icon, colorClass = 'bg-gray-100' }) => (
+    // Note: We use <i> tags with `data-lucide` instead of React components
+    const MetricCard = ({ title, value, unit, icon, colorClass = 'bg-gray-100' }) => (
         <div className={`p-3 rounded-xl shadow-lg flex flex-col items-center justify-center ${colorClass} text-gray-800 transition duration-300 transform hover:scale-[1.02] border border-opacity-20`}>
             <div className="flex items-center space-x-1 mb-1">
-                <Icon className="w-4 h-4 text-emerald-600 opacity-80" />
+                <i data-lucide={icon} className="w-4 h-4 text-emerald-600 opacity-80"></i>
                 <h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{title}</h3>
             </div>
             <p className="text-xl font-extrabold text-emerald-800">
@@ -441,7 +444,6 @@ function App() {
                     isSabbatical: isSabbatical(date) 
                 };
             }
-            
             const logEntry = dailyLog[dateStr];
             weeks[weekKey].totalDrinks += logEntry.drinks;
             weeks[weekKey].days[dateStr] = logEntry.drinks;
@@ -456,7 +458,7 @@ function App() {
         <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
             <header className="py-4 mb-6 border-b border-amber-300">
                 <h1 className="text-2xl font-extrabold text-emerald-800 flex items-center">
-                    <Flame className="w-6 h-6 mr-2 text-amber-500" />
+                    <i data-lucide="flame" className="w-6 h-6 mr-2 text-amber-500"></i>
                     Sober*ish
                 </h1>
                 <p className="text-sm text-gray-500 mt-1">
@@ -467,9 +469,9 @@ function App() {
             <section className="mb-8 p-4 bg-emerald-50 rounded-xl shadow-inner border border-emerald-200">
                 <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsGoalCollapsed(!isGoalCollapsed)}>
                     <h2 className="text-lg font-bold text-emerald-800 flex items-center">
-                        <Goal className="w-5 h-5 mr-2 text-emerald-600" /> Annual Goal Setting
+                        <i data-lucide="goal" className="w-5 h-5 mr-2 text-emerald-600"></i> Annual Goal Setting
                     </h2>
-                    {isGoalCollapsed ? <ChevronDown className="w-5 h-5 text-emerald-600" /> : <ChevronUp className="w-5 h-5 text-emerald-600" />}
+                    {isGoalCollapsed ? <i data-lucide="chevron-down" className="w-5 h-5 text-emerald-600"></i> : <i data-lucide="chevron-up" className="w-5 h-5 text-emerald-600"></i>}
                 </div>
 
                 {!isGoalCollapsed && (
@@ -498,7 +500,7 @@ function App() {
                                 onClick={handleResetData}
                                 className="w-full flex items-center justify-center bg-gray-200 text-red-600 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-300 transition duration-150"
                             >
-                                <Trash2 className="w-4 h-4 mr-2" />
+                                <i data-lucide="trash-2" className="w-4 h-4 mr-2"></i>
                                 Reset All Data (Log & Goal)
                             </button>
                             <p className="text-xs text-gray-500 mt-2 text-center">
@@ -515,19 +517,19 @@ function App() {
                      <MetricCard
                         title="Goal / Week"
                         value={goalDrinksPerWeek.toFixed(2)}
-                        icon={Calculator}
+                        icon="calculator"
                         colorClass="bg-white border border-gray-100"
                     />
                     <MetricCard
                         title="Annual Drinks"
                         value={metrics.totalGoalDrinks} 
-                        icon={Goal}
+                        icon="goal"
                         colorClass="bg-white border border-gray-100"
                     />
                     <MetricCard
                         title="Annual Bottles"
                         value={metrics.totalGoalBottles} 
-                        icon={Wine}
+                        icon="wine"
                         colorClass="bg-white border border-gray-100"
                     />
                 </div>
@@ -562,7 +564,7 @@ function App() {
                                 disabled={currentDrinks <= 0}
                                 aria-label="Decrement drinks"
                             >
-                                <Minus className="w-5 h-5" />
+                                <i data-lucide="minus" className="w-5 h-5"></i>
                             </button>
                             <div className="flex-grow text-center">
                                 <span className="text-4xl font-extrabold text-emerald-800 tabular-nums">
@@ -574,7 +576,7 @@ function App() {
                                 className="p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-md transition duration-150 active:bg-emerald-700"
                                 aria-label="Increment drinks"
                             >
-                                <Plus className="w-5 h-5" />
+                                <i data-lucide="plus" className="w-5 h-5"></i>
                             </button>
                         </div>
                     </div>
@@ -596,20 +598,20 @@ function App() {
                         title="Avg / Week"
                         value={metrics.pacingAvgPerWeek.toFixed(2)}
                         unit={`vs ${goalDrinksPerWeek.toFixed(1)} goal`}
-                        icon={Calculator}
+                        icon="calculator"
                         colorClass="bg-gray-100"
                     />
                     <MetricCard
                         title="Bottle Pace"
                         value={metrics.bottlesProjected.toFixed(2)}
                         unit="Annual Pacing"
-                        icon={Wine}
+                        icon="wine"
                         colorClass={metrics.bottlesProjected > metrics.totalGoalBottles ? 'bg-red-100' : 'bg-emerald-100'}
                     />
                     <MetricCard
                         title="Total Consumed"
                         value={metrics.trackingPeriodDrinks}
-                        icon={CalendarCheck}
+                        icon="calendar-check"
                         colorClass="bg-gray-100"
                     />
                 </div>
