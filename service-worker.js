@@ -1,9 +1,9 @@
 // Name of the cache storage
-const CACHE_NAME = 'dram-tracker-cache-v2'; // Incremented cache name
+const CACHE_NAME = 'dram-tracker-cache-v3'; // Incremented cache name
 
 // List of all files the Service Worker should cache immediately
 const urlsToCache = [
-    'index.html', // Cache the main HTML file
+    'index.html',
     'manifest.json',
     'icon-192.png', 
     'icon-512.png',
@@ -12,8 +12,8 @@ const urlsToCache = [
     'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js', 
     'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
     'https://unpkg.com/@babel/standalone/babel.min.js',
-    'https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js',
-    // NEW: Firebase v8 Compat scripts
+    'https://unpkg.com/lucide@latest/dist/umd/lucide.js', // Core lucide
+    // Firebase v8 Compat scripts
     'https://www.gstatic.com/firebasejs/8.10.1/firebase-app-compat.js',
     'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth-compat.js',
     'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore-compat.js'
@@ -36,8 +36,12 @@ self.addEventListener('install', (event) => {
 
 // --- FETCH EVENT ---
 self.addEventListener('fetch', (event) => {
+    // IMPORTANT: Do not cache non-http requests (like chrome-extension://)
+    if (!event.request.url.startsWith('http')) {
+        return;
+    }
+
     // For navigation requests (like loading the page), always go to the network first
-    // This ensures you get the latest HTML, but fall back to cache if offline.
     if (event.request.mode === 'navigate') {
         event.respondWith(
             fetch(event.request)
@@ -62,6 +66,7 @@ self.addEventListener('fetch', (event) => {
                     // Not in cache? Go to network.
                     return fetch(event.request).then(
                         (response) => {
+                            // Don't cache failing or non-basic requests
                             if (!response || response.status !== 200 || response.type !== 'basic') {
                                 return response;
                             }
