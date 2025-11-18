@@ -73,35 +73,14 @@
 const { useState, useEffect, useMemo, useCallback, Fragment } = React;
 // We no longer get icons from LucideReact, we will call a function instead.
 
-// --- Global Constants ---
-const DAYS_IN_SABBATICAL = 107;
-const SABBATICAL_END_WEEK = 15;
-const TOTAL_TRACKING_WEEKS = 37;
-const DRINK_VOLUME_ML = 45;
+// The base constants for your tracking goals
+const DAYS_IN_SABBATICAL = 107; 
+const TOTAL_TRACKING_WEEKS = 37; // --- FIX: Reverted from 52 back to 37 ---
+const SABBATICAL_END_WEEK = 15; // Approx. 107 / 7
+const DRINK_VOLUME_ML = 45; 
 const BOTTLE_VOLUME_ML = 750;
 const DEFAULT_GOAL = 1.8;
 
-// --- Firebase Config (From your verified file) ---
-const firebaseConfig = {
-    apiKey: "AIzaSyD92lDT-pbCB-EmtnTaEUhyql-CCYsLhho",
-    authDomain: "dram-50c7c.firebaseapp.com",
-    projectId: "dram-50c7c",
-    storageBucket: "dram-50c7c.firebasestorage.app",
-    messagingSenderId: "645616473221",
-    appId: "1:645616473221:web:3a79dd9a2313f01bd0c5ec",
-    measurementId: "G-VL3RYR0YRD"
-};
-
-// --- Initialize Firebase (v8 Compat syntax) ---
-// We get 'firebase' from the script loaded in the <head>
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
-const db = firebase.firestore();
-const auth = firebase.auth();
-const appId = "dram-50c7c"; // Your Project ID
-
-// --- Utility Functions ---
 const round = (num) => Math.round(num * 100) / 100;
 
 const getDayOfYear = (date) => {
@@ -117,17 +96,81 @@ const getCalendarWeek = (date) => {
     return Math.min(Math.floor((doy - 1) / 7) + 1, 53); 
 };
 
+// Calculates elapsed weeks *within the 37-week tracking period*
 const getElapsedTrackingWeeks = (date) => {
   const doy = getDayOfYear(date);
-  if (doy <= DAYS_IN_SABBATICAL) return 0;
+  if (doy <= DAYS_IN_SABBATICAL) return 0; 
+  
   const currentWeek = getCalendarWeek(date);
+  // Elapsed weeks = Current Week Number - Sabbatical End Week Number
   const elapsedWeeks = currentWeek - SABBATICAL_END_WEEK;
+  
+  // Return at least 1 week if in period, max of 37
   return Math.max(1, Math.min(elapsedWeeks, TOTAL_TRACKING_WEEKS));
 };
 
 const isSabbatical = (date) => getDayOfYear(date) <= DAYS_IN_SABBATICAL;
 
 const formatDate = (date) => date.toISOString().split('T')[0];
+
+// --- COMPONENT: Full Screen Liquid Background (Seamless Loop Fix) ---
+const BackgroundLiquid = ({ percent }) => {
+    const fillHeight = Math.min(Math.max(percent, 0), 100);
+    
+    // This is one SVG wave. We will duplicate it.
+    const WaveSvg = ({fillClass}) => (
+        <svg viewBox="0 0 500 150" preserveAspectRatio="none" className={`h-full w-full ${fillClass}`}>
+            <path d="M0.00,49.98 C150.00,80.00 350.00,20.00 500.00,49.98 L500.00,150.00 L0.00,150.00 Z"></path>
+        </svg>
+    );
+
+    return (
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-gray-50">
+            {/* The Liquid Container */}
+            <div 
+                className="absolute bottom-0 left-0 right-0 transition-all duration-[2000ms] ease-in-out"
+                style={{ height: `${fillHeight}%` }}
+            >
+                {/* Deep Liquid Fill (Sits BELOW the waves to hide the bottom edge) */}
+                <div className="absolute inset-0 top-6 bg-amber-500/40"></div>
+
+                {/* Wave 1 (Back Layer - Slower) 
+                    This div is 200% wide and contains TWO SVGs.
+                */}
+                <div className="absolute top-0 left-0 w-[200%] h-24 -mt-12 opacity-40 animate-wave-slow flex">
+                     <WaveSvg fillClass="fill-amber-600" />
+                     <WaveSvg fillClass="fill-amber-600" />
+                </div>
+
+                {/* Wave 2 (Front Layer - Faster)
+                    This div is 200% wide and contains TWO SVGs.
+                */}
+                <div className="absolute top-0 left-0 w-[200%] h-20 -mt-8 opacity-50 animate-wave flex">
+                     <WaveSvg fillClass="fill-amber-500" />
+                     <WaveSvg fillClass="fill-amber-500" />
+                </div>
+            </div>
+
+             {/* Custom Style for Wave Animation */}
+            <style>{`
+                @keyframes wave {
+                    0% { transform: translateX(0); }
+                    100% { transform: translateX(-50%); } /* Moves left by 100vw (half of its 200vw width) */
+                }
+                 @keyframes wave-slow {
+                    0% { transform: translateX(-50%); } /* Starts offset */
+                    100% { transform: translateX(0); } /* Moves right to its start */
+                }
+                .animate-wave {
+                    animation: wave 12s linear infinite;
+                }
+                 .animate-wave-slow {
+                    animation: wave-slow 18s linear infinite;
+                }
+            `}</style>
+        </div>
+    );
+};
 
 // --- Main Logic Hook ---
 const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => { 
@@ -136,12 +179,14 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
         return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
     }, []);
     
+    // Find the latest date with *any* log after the sabbatical ended (Day 107).
     const lastLogDateString = useMemo(() => {
         const loggedDates = Object.keys(dailyLog).sort();
         let latestDate = null;
         for (const dateStr of loggedDates.reverse()) {
             const date = new Date(dateStr + 'T00:00:00Z');
-            if (!isSabbatical(date)) {
+            // We only care about logs *after* the sabbatical
+            if (!isSabbatical(date)) { 
                 latestDate = dateStr;
                 break;
             }
@@ -149,75 +194,94 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
         return latestDate;
     }, [dailyLog]);
     
+    // The pacing reference date is the last date logged (or today if no post-sabbatical logs)
     const pacingReferenceDate = useMemo(() => {
         if (lastLogDateString) {
             return new Date(lastLogDateString + 'T00:00:00Z'); 
         }
+        // If no post-sabbatical logs, use today to get correct elapsed weeks (will be 0 if still in sabbatical).
         return today; 
     }, [lastLogDateString, today]);
     
+    // Calculate elapsed weeks based on the pacing reference date
     const elapsedTrackingWeeks = useMemo(() => getElapsedTrackingWeeks(pacingReferenceDate), [pacingReferenceDate]);
 
     const metrics = useMemo(() => {
-        let totalDrinksConsumed = 0;
+        let totalDrinksConsumed = 0; // Total all year
         let sabbaticalExceptions = 0;
-        let trackingPeriodDrinks = 0;
-
+        let trackingPeriodDrinks = 0; // --- FIX: Only drinks *after* sabbatical ---
+        
+        // --- FIX: Use TOTAL_TRACKING_WEEKS (37) ---
         const totalGoalDrinksFloat = goalDrinksPerWeek * TOTAL_TRACKING_WEEKS;
         const totalGoalBottlesFloat = (totalGoalDrinksFloat * DRINK_VOLUME_ML) / BOTTLE_VOLUME_ML;
         
         const totalGoalDrinks = Math.round(totalGoalDrinksFloat);
-        const totalGoalBottles = Math.round(totalGoalBottlesFloat);
+        const totalGoalBottles = round(totalGoalBottlesFloat);
         
         Object.values(dailyLog).forEach(entry => {
-            totalDrinksConsumed += entry.drinks;
+            totalDrinksConsumed += entry.drinks; // Still useful for a total count, but not for pacing
             const date = new Date(entry.date + 'T00:00:00Z'); 
-            if (isSabbatical(date) && entry.drinks > 0) {
-                sabbaticalExceptions += entry.drinks;
-            }
-            if (!isSabbatical(date)) {
-                trackingPeriodDrinks += entry.drinks;
+            
+            // --- FIX: Logic to separate sabbatical vs tracking drinks ---
+            if (isSabbatical(date)) {
+                if (entry.drinks > 0) {
+                    sabbaticalExceptions += entry.drinks;
+                }
+            } else {
+                trackingPeriodDrinks += entry.drinks; // Only count post-sabbatical drinks
             }
         });
         
-        const targetConsumedToDate = elapsedTrackingWeeks * goalDrinksPerWeek;
-
         let pacingAvgPerWeek = 0;
         let totalProjectedDrinks = 0;
         let bottlesProjected = 0;
 
+        // --- FIX: Use elapsedTrackingWeeks ---
         if (elapsedTrackingWeeks > 0) {
+            // --- FIX: Use trackingPeriodDrinks for pacing ---
             pacingAvgPerWeek = round(trackingPeriodDrinks / elapsedTrackingWeeks);
             totalProjectedDrinks = pacingAvgPerWeek * TOTAL_TRACKING_WEEKS;
             bottlesProjected = round((totalProjectedDrinks * DRINK_VOLUME_ML) / BOTTLE_VOLUME_ML);
         }
 
+        // --- FIX: Use trackingPeriodDrinks for goal % ---
         const percentOfGoal = totalGoalDrinks > 0 
-            ? round((trackingPeriodDrinks / totalGoalDrinks) * 100)
+            ? (trackingPeriodDrinks / totalGoalDrinks) * 100
             : (trackingPeriodDrinks > 0 ? 100 : 0); 
         
+        // --- FIX: Use trackingPeriodDrinks for reserve ---
         const drinksReserve = totalGoalDrinks - trackingPeriodDrinks;
         
         return {
             totalGoalDrinks,
             totalGoalBottles,
-            totalDrinksConsumed,
-            elapsedTrackingWeeks,
+            totalDrinksConsumed, // This is total for the year
+            elapsedTrackingWeeks, // Correct elapsed weeks (1-37)
             pacingAvgPerWeek,
             bottlesProjected,
-            percentOfGoal,
+            percentOfGoal, 
             drinksOnReserve: Math.round(drinksReserve),
             projectedAnnualDrinks: Math.round(totalProjectedDrinks),
             sabbaticalExceptions,
-            trackingPeriodDrinks,
-            targetConsumedToDate: round(targetConsumedToDate)
+            trackingPeriodDrinks: trackingPeriodDrinks, // The official number for pacing
         };
+        
     }, [dailyLog, elapsedTrackingWeeks, goalDrinksPerWeek, lastLogDateString]); 
     
     return metrics;
 };
 
-// --- Main App Component ---
+let firebaseApp, db, auth;
+if (Object.keys(firebaseConfig).length > 0) {
+    try {
+        firebaseApp = initializeApp(firebaseConfig);
+        db = getFirestore(firebaseApp);
+        auth = getAuth(firebaseApp);
+    } catch (e) {
+        console.error("Firebase initialization failed:", e);
+    }
+}
+
 function App() {
     const [userId, setUserId] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
@@ -231,35 +295,29 @@ function App() {
     const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
     const [currentDrinks, setCurrentDrinks] = useState(0);
 
-    // 1. Firebase Authentication & Setup
+    // --- Accelerometer state and effect have been REMOVED ---
+
     useEffect(() => {
+        if (!auth) { setLoading(false); return; }
         const setupAuth = async () => {
             try {
-                await auth.signInAnonymously();
-            } catch (error) {
-                console.error("Auth error:", error);
-            }
+                if (initialAuthToken) { await signInWithCustomToken(auth, initialAuthToken); } 
+                else { await signInAnonymously(auth); }
+            } catch (error) { console.error("Auth error:", error); }
         };
-
-        const unsubscribe = auth.onAuthStateChanged((user) => {
-            if (user) {
-                setUserId(user.uid);
-            } else {
-                setUserId(null);
-            }
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) { setUserId(user.uid); } else { setUserId(null); }
             setIsAuthReady(true);
         });
-
         setupAuth();
         return () => unsubscribe();
     }, []);
 
-    // 2. Firestore Listener for Goal Settings
     useEffect(() => {
-        if (!isAuthReady || !userId) return;
-        const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
-        const unsubscribe = goalDocRef.onSnapshot((docSnapshot) => {
-            if (docSnapshot.exists) {
+        if (!isAuthReady || !userId || !db) return;
+        const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/settings/goals`);
+        const unsubscribe = onSnapshot(goalDocRef, (docSnapshot) => {
+            if (docSnapshot.exists()) {
                 const data = docSnapshot.data();
                 const newGoal = parseFloat(data.goalDrinksPerWeek) || DEFAULT_GOAL; 
                 setGoalDrinksPerWeek(newGoal);
@@ -269,18 +327,14 @@ function App() {
                 setTempGoalInput(DEFAULT_GOAL);
             }
             setLoading(false);
-        }, (error) => {
-            console.error("Error listening to goals:", error);
-            setLoading(false);
-        });
+        }, (error) => { setLoading(false); });
         return () => unsubscribe();
     }, [isAuthReady, userId]);
 
-    // 3. Firestore Listener for Daily Log
     useEffect(() => {
-        if (!isAuthReady || !userId) return;
-        const logCollectionRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`);
-        const unsubscribe = logCollectionRef.onSnapshot((snapshot) => {
+        if (!isAuthReady || !userId || !db) return;
+        const logCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/drink_tracker`);
+        const unsubscribe = onSnapshot(query(logCollectionRef), (snapshot) => {
             const newLog = {};
             snapshot.forEach((doc) => {
                 const data = doc.data();
@@ -288,105 +342,75 @@ function App() {
             });
             setDailyLog(newLog);
             const logEntry = newLog[selectedDate];
-            if (logEntry) {
-                setCurrentDrinks(logEntry.drinks);
-            } else if (!newLog[selectedDate]) {
-                setCurrentDrinks(0);
-            }
-        }, (error) => {
-            console.error("Error listening to log:", error);
+            if (logEntry) { setCurrentDrinks(logEntry.drinks); } 
+            else if (!newLog[selectedDate]) { setCurrentDrinks(0); }
         });
         return () => unsubscribe();
     }, [isAuthReady, userId, selectedDate]);
 
-    // Update currentDrinks when selectedDate changes
     useEffect(() => {
         const logEntry = dailyLog[selectedDate];
         setCurrentDrinks(logEntry ? logEntry.drinks : 0);
     }, [selectedDate, dailyLog]);
     
-    // NEW: Icon Rendering Effect
-    // This runs after every render to find all `data-lucide` attributes
-    // and replace them with SVG icons. This is the stable fix.
-    useEffect(() => {
-        if (window.lucide) {
-            window.lucide.createIcons();
-        }
-    }, [loading, isGoalCollapsed, metrics]); // Re-run when state changes
-    
     const metrics = useTrackerMetrics(dailyLog, goalDrinksPerWeek); 
 
-    // --- Actions ---
     const handleDateChange = (e) => setSelectedDate(e.target.value);
     const handleIncrement = () => setCurrentDrinks(prev => prev + 1);
     const handleDecrement = () => setCurrentDrinks(prev => Math.max(0, prev - 1));
 
     const handleSaveLog = useCallback(async () => {
-        if (!userId) return;
-        const docRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`).doc(selectedDate);
+        if (!userId || !db) return;
+        const docRef = doc(db, `artifacts/${appId}/users/${userId}/drink_tracker/${selectedDate}`);
         try {
-            await docRef.set({
+            await setDoc(docRef, {
                 date: selectedDate,
                 drinks: currentDrinks,
                 timestamp: new Date(),
             }, { merge: true });
-            console.log("Log saved/edited successfully for:", selectedDate);
-        } catch (e) {
-            console.error("Error adding document: ", e);
-        }
-    }, [userId, selectedDate, currentDrinks]);
+        } catch (e) { console.error(e); }
+    }, [userId, db, selectedDate, currentDrinks]);
 
     const handleSaveGoal = useCallback(async () => {
-        if (!userId) return;
+        if (!userId || !db) return;
         const newGoal = parseFloat(tempGoalInput);
         if (isNaN(newGoal) || newGoal < 0) return;
-        const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
+        const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/settings/goals`);
         try {
-            await goalDocRef.set({
+            await setDoc(goalDocRef, {
                 goalDrinksPerWeek: round(newGoal),
                 lastUpdated: new Date(),
             }, { merge: true });
-            console.log("Goal saved successfully:", round(newGoal));
             setIsGoalCollapsed(true);
-        } catch (e) {
-            console.error("Error saving goal: ", e);
-        }
-    }, [userId, tempGoalInput]);
+        } catch (e) { console.error(e); }
+    }, [userId, db, tempGoalInput]);
     
     const handleResetData = useCallback(async () => {
-        if (!userId) return;
+        if (!userId || !db) return;
         console.warn("Attempting to RESET ALL DATA.");
-        const logCollectionRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`);
+        const logCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/drink_tracker`);
         try {
-            const snapshot = await logCollectionRef.get();
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            console.log("Successfully deleted all drink log documents.");
-        } catch (e) {
-            console.error("Error deleting documents:", e);
-        }
-        const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
-        try {
-            await goalDocRef.set({
-                goalDrinksPerWeek: DEFAULT_GOAL,
-                lastUpdated: new Date(),
+            const snapshot = await getDocs(logCollectionRef);
+            const deletePromises = [];
+            snapshot.docs.forEach(docSnapshot => {
+                deletePromises.push(deleteDoc(doc(db, logCollectionRef.path, docSnapshot.id)));
             });
-            console.log(`Goal reset to default: ${DEFAULT_GOAL}`);
-        } catch (e) {
-            console.error("Error resetting goal:", e);
-        }
-    }, [userId]);
+            await Promise.all(deletePromises);
+        } catch (e) { console.error(e); }
+        const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/settings/goals`);
+        try {
+            await setDoc(goalDocRef, { goalDrinksPerWeek: DEFAULT_GOAL, lastUpdated: new Date() });
+        } catch (e) { console.error(e); }
+    }, [userId, db]);
 
     // --- UI Components ---
-    // Note: We use <i> tags with `data-lucide` instead of React components
-    const MetricCard = ({ title, value, unit, icon, colorClass = 'bg-gray-100' }) => (
-        <div className={`p-3 rounded-xl shadow-lg flex flex-col items-center justify-center ${colorClass} text-gray-800 transition duration-300 transform hover:scale-[1.02] border border-opacity-20`}>
+    const MetricCard = ({ title, value, unit, icon: Icon, colorClass = 'bg-white/80' }) => (
+        <div className={`p-3 rounded-xl shadow-lg flex flex-col items-center justify-center ${colorClass} backdrop-blur-md text-gray-800 transition duration-300 transform hover:scale-[1.02] border border-opacity-40 border-white`}>
             <div className="flex items-center space-x-1 mb-1">
-                <i data-lucide={icon} className="w-4 h-4 text-emerald-600 opacity-80"></i>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{title}</h3>
+                <Icon className="w-4 h-4 text-emerald-800 opacity-90" />
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">{title}</h3>
             </div>
-            <p className="text-xl font-extrabold text-emerald-800">
+            <p className="text-xl font-extrabold text-emerald-900">
                 {value}
             </p>
             {unit && <span className="text-[10px] font-medium text-gray-600 mt-0.5">{unit}</span>}
@@ -398,16 +422,16 @@ function App() {
         const sign = value > 0 ? '+' : (value < 0 ? '' : '');
         const absoluteValue = Math.abs(Math.round(value)); 
         const colorClass = isOver 
-            ? 'bg-red-700 text-white shadow-lg shadow-red-400'
-            : 'bg-emerald-600 text-white shadow-lg shadow-emerald-400';
+            ? 'bg-red-700/90 text-white shadow-red-400/50' 
+            : 'bg-emerald-600/90 text-white shadow-emerald-400/50';
 
         return (
-            <div className={`p-2 rounded-xl flex flex-col items-center justify-center h-full w-full transition duration-300 ${colorClass}`}>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider opacity-80 mb-0.5">Reserve</h3>
+            <div className={`p-4 rounded-xl flex flex-col items-center justify-center h-full w-full transition duration-300 shadow-xl backdrop-blur-sm ${colorClass}`}>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider opacity-90 mb-0.5">Reserve</h3>
                 <p className="text-3xl font-extrabold">
                     {sign}{absoluteValue} 
                 </p>
-                <span className="text-[10px] font-medium opacity-80">{unit}</span>
+                <span className="text-[10px] font-medium opacity-90">{unit}</span>
             </div>
         );
     };
@@ -455,261 +479,271 @@ function App() {
     const sortedWeeks = Object.keys(weeklyData).sort().reverse();
     
     return (
-        <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
-            <header className="py-4 mb-6 border-b border-amber-300">
-                <h1 className="text-2xl font-extrabold text-emerald-800 flex items-center">
-                    <i data-lucide="flame" className="w-6 h-6 mr-2 text-amber-500"></i>
-                    Sober*ish
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                    Tracking Goal: **{goalDrinksPerWeek.toFixed(2)} drinks/week** ({metrics.totalGoalDrinks} annual drinks).
-                </p>
-            </header>
+        // Added relative positioning for z-index context
+        <div className="min-h-screen font-sans relative">
             
-            <section className="mb-8 p-4 bg-emerald-50 rounded-xl shadow-inner border border-emerald-200">
-                <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsGoalCollapsed(!isGoalCollapsed)}>
-                    <h2 className="text-lg font-bold text-emerald-800 flex items-center">
-                        <i data-lucide="goal" className="w-5 h-5 mr-2 text-emerald-600"></i> Annual Goal Setting
-                    </h2>
-                    {isGoalCollapsed ? <i data-lucide="chevron-down" className="w-5 h-5 text-emerald-600"></i> : <i data-lucide="chevron-up" className="w-5 h-5 text-emerald-600"></i>}
-                </div>
+            {/* The Background Liquid - Fills based on goal percentage */}
+            {/* --- FIX: Use metrics.percentOfGoal --- */}
+            <BackgroundLiquid percent={metrics.percentOfGoal} />
 
-                {!isGoalCollapsed && (
-                    <div className="mt-4 pt-3 border-t border-emerald-200">
-                        <div className="grid grid-cols-3 gap-4 items-end">
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-emerald-700 mb-1">Drinks Goal / Week (e.g., 1.8)</label>
-                                <input
-                                    type="number"
-                                    value={tempGoalInput}
-                                    onChange={(e) => setTempGoalInput(e.target.value)}
-                                    min="0"
-                                    step="0.1"
-                                    className="w-full p-2 border border-emerald-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+            {/* Main Content - Sits ON TOP of the liquid (z-10) */}
+            <div className="relative z-10 p-4 max-w-lg mx-auto">
+                
+                <header className="py-4 mb-6 border-b border-amber-300/50">
+                    <h1 className="text-2xl font-extrabold text-emerald-900 flex items-center drop-shadow-sm">
+                        <Flame className="w-6 h-6 mr-2 text-amber-600" />
+                        Sober*ish
+                    </h1>
+                    {/* --- MODIFIED: Header text updated to new format --- */}
+                    <p className="text-sm text-emerald-900 font-medium mt-1 drop-shadow-sm">
+                        {/* --- FIX: Use metrics.totalGoalBottles --- */}
+                        Goals: {goalDrinksPerWeek.toFixed(2)} drinks/week | {metrics.totalGoalDrinks} annual drinks | {metrics.totalGoalBottles.toFixed(2)} annual bottles
+                    </p>
+                </header>
+                
+                {/* Cards updated with bg-white/90 for readability over liquid */}
+                <section className="mb-8 p-4 bg-white/90 backdrop-blur-md rounded-xl shadow-xl border border-emerald-100">
+                    <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsGoalCollapsed(!isGoalCollapsed)}>
+                        <h2 className="text-lg font-bold text-emerald-800 flex items-center">
+                            <Goal className="w-5 h-5 mr-2 text-emerald-600" /> Annual Goal Setting
+                        </h2>
+                        {isGoalCollapsed ? <ChevronDown className="w-5 h-5 text-emerald-600" /> : <ChevronUp className="w-5 h-5 text-emerald-600" />}
+                    </div>
+
+                    {!isGoalCollapsed && (
+                        <div className="mt-4 pt-3 border-t border-emerald-200">
+                            
+                            {/* --- MOVED: Goal Metric Cards are now inside the collapsible section --- */}
+                            <div className="grid grid-cols-3 gap-3 mb-6">
+                                 <MetricCard
+                                    title="Goal / Week"
+                                    value={goalDrinksPerWeek.toFixed(2)}
+                                    icon={Calculator}
+                                    colorClass="bg-white/85"
+                                />
+                                <MetricCard
+                                    title="Annual Drinks"
+                                    value={metrics.totalGoalDrinks} 
+                                    icon={Goal}
+                                    colorClass="bg-white/85"
+                                />
+                                <MetricCard
+                                    title="Annual Bottles"
+                                    // --- FIX: Use metrics.totalGoalBottles ---
+                                    value={metrics.totalGoalBottles.toFixed(2)} 
+                                    icon={Wine}
+                                    colorClass="bg-white/85"
                                 />
                             </div>
-                            <button
-                                onClick={handleSaveGoal}
-                                className="w-full bg-emerald-600 text-white py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-emerald-700 transition duration-150"
-                            >
-                                Update Goal
-                            </button>
-                        </div>
-                         <div className="mt-6">
-                            <button
-                                onClick={handleResetData}
-                                className="w-full flex items-center justify-center bg-gray-200 text-red-600 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-300 transition duration-150"
-                            >
-                                <i data-lucide="trash-2" className="w-4 h-4 mr-2"></i>
-                                Reset All Data (Log & Goal)
-                            </button>
-                            <p className="text-xs text-gray-500 mt-2 text-center">
-                                *This action is irreversible and clears your log history and resets the goal to {DEFAULT_GOAL}.
-                            </p>
-                        </div>
-                    </div>
-                )}
-            </section>
-            
-            <section className="mb-8">
-                <h2 className="text-xl font-bold mb-4 text-emerald-800">Annual Goals</h2>
-                <div className="grid grid-cols-3 gap-3">
-                     <MetricCard
-                        title="Goal / Week"
-                        value={goalDrinksPerWeek.toFixed(2)}
-                        icon="calculator"
-                        colorClass="bg-white border border-gray-100"
-                    />
-                    <MetricCard
-                        title="Annual Drinks"
-                        value={metrics.totalGoalDrinks} 
-                        icon="goal"
-                        colorClass="bg-white border border-gray-100"
-                    />
-                    <MetricCard
-                        title="Annual Bottles"
-                        value={metrics.totalGoalBottles} 
-                        icon="wine"
-                        colorClass="bg-white border border-gray-100"
-                    />
-                </div>
-            </section>
 
-            {isTodaySabbatical && (
-                <div className="mb-6 p-3 bg-amber-50 border-l-4 border-amber-500 rounded-xl shadow-sm">
-                    <p className="font-bold text-amber-700">Sabbatical Period Active (Wk {getCalendarWeek(currentDay)})</p>
-                    <p className="text-sm text-amber-600">Encouragement: You are in the first 107 days. Logged drinks are considered **Exceptions**.</p>
-                </div>
-            )}
-
-            <section className="mb-8 p-4 bg-white rounded-xl shadow-xl">
-                <h2 className="text-lg font-bold mb-4 text-emerald-800">Log Daily Consumption (1 Drink = 1 Dram)</h2>
-                <div className="grid grid-cols-2 gap-4 items-end">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={handleDateChange}
-                            className="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
-                            max={formatDate(new Date())}
-                        />
-                    </div>
-                    <div className="text-center">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Drams/Drinks Consumed</label>
-                        <div className="flex justify-between items-center space-x-2">
-                            <button
-                                onClick={handleDecrement}
-                                className="p-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full shadow-md transition duration-150 active:bg-gray-400 disabled:opacity-50"
-                                disabled={currentDrinks <= 0}
-                                aria-label="Decrement drinks"
-                            >
-                                <i data-lucide="minus" className="w-5 h-5"></i>
-                            </button>
-                            <div className="flex-grow text-center">
-                                <span className="text-4xl font-extrabold text-emerald-800 tabular-nums">
-                                    {currentDrinks}
-                                </span>
+                            <div className="grid grid-cols-3 gap-4 items-end">
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-emerald-700 mb-1">Drinks Goal / Week (e.g., 1.8)</label>
+                                    <input
+                                        type="number"
+                                        value={tempGoalInput}
+                                        onChange={(e) => setTempGoalInput(e.target.value)}
+                                        min="0"
+                                        step="0.1"
+                                        className="w-full p-2 border border-emerald-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 bg-white/50"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSaveGoal}
+                                    className="w-full bg-emerald-600 text-white py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-emerald-700 transition duration-150"
+                                >
+                                    Update Goal
+                                </button>
                             </div>
-                            <button
-                                onClick={handleIncrement}
-                                className="p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-md transition duration-150 active:bg-emerald-700"
-                                aria-label="Increment drinks"
-                            >
-                                <i data-lucide="plus" className="w-5 h-5"></i>
-                            </button>
+                             <div className="mt-6">
+                                <button
+                                    onClick={handleResetData}
+                                    className="w-full flex items-center justify-center bg-gray-200 text-red-600 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-300 transition duration-150"
+                                >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Reset All Data (Log & Goal)
+                                </button>
+                                <p className="text-xs text-gray-500 mt-2 text-center">
+                                    *This action is irreversible and clears your log history and resets the goal to {DEFAULT_GOAL}.
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                </div>
-                <button
-                    onClick={handleSaveLog}
-                    className="mt-5 w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold text-lg shadow-lg hover:bg-emerald-700 transition duration-150 transform hover:scale-[1.01]"
-                >
-                    {dailyLog[selectedDate] ? `Overwrite Log with ${currentDrinks} Drinks` : `Save ${currentDrinks} Drinks`}
-                </button>
-            </section>
-            
-            <section className="mb-8">
-                <h2 className="text-xl font-bold mb-4 text-emerald-800">
-                    Pacing Metrics
-                </h2>
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                    <MetricCard
-                        title="Avg / Week"
-                        value={metrics.pacingAvgPerWeek.toFixed(2)}
-                        unit={`vs ${goalDrinksPerWeek.toFixed(1)} goal`}
-                        icon="calculator"
-                        colorClass="bg-gray-100"
-                    />
-                    <MetricCard
-                        title="Bottle Pace"
-                        value={metrics.bottlesProjected.toFixed(2)}
-                        unit="Annual Pacing"
-                        icon="wine"
-                        colorClass={metrics.bottlesProjected > metrics.totalGoalBottles ? 'bg-red-100' : 'bg-emerald-100'}
-                    />
-                    <MetricCard
-                        title="Total Consumed"
-                        value={metrics.trackingPeriodDrinks}
-                        icon="calendar-check"
-                        colorClass="bg-gray-100"
-                    />
-                </div>
-                <div className="flex space-x-4 h-24">
-                    <div className="w-3/4 bg-white rounded-xl shadow-xl p-4 flex flex-col justify-center border border-gray-200">
-                        <div className="flex justify-between items-center mb-1">
-                            <h3 className="text-sm font-bold text-gray-700">Goal Progress (Annual Countdown)</h3>
-                            <span className={`text-xl font-extrabold ${metrics.percentOfGoal > 100 ? 'text-red-600' : 'text-emerald-600'}`}>
-                                {metrics.percentOfGoal.toFixed(1)}%
-                            </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                            <div 
-                                className={`h-full rounded-full transition-all duration-500 ${metrics.percentOfGoal > 100 ? 'bg-red-500' : 'bg-emerald-500'}`} 
-                                style={{ width: `${Math.min(metrics.percentOfGoal, 100)}%` }}
-                            ></div>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                            Consumed: {metrics.trackingPeriodDrinks} / {metrics.totalGoalDrinks} drinks
-                        </p>
-                    </div>
-                    <div className="w-1/4">
-                        <ReservePill 
-                            value={metrics.drinksOnReserve} 
-                            unit="Drinks" 
-                        />
-                    </div>
-                </div>
-                {metrics.sabbaticalExceptions > 0 && (
-                     <div className="mt-4 p-3 bg-amber-50 border-l-4 border-amber-500 rounded-xl shadow-sm">
-                        <p className="font-bold text-amber-700">Sabbatical Exceptions: {metrics.sabbaticalExceptions} Drinks</p>
-                        <p className="text-xs text-amber-600">These were logged during the first 107 days.</p>
+                    )}
+                </section>
+                
+                {/* --- REMOVED: Standalone "Annual Goals" section --- */}
+
+                {isTodaySabbatical && (
+                    <div className="mb-6 p-3 bg-amber-100/90 border-l-4 border-amber-500 rounded-xl shadow-lg backdrop-blur-sm">
+                        <p className="font-bold text-amber-800">Sabbatical Period Active (Wk {getCalendarWeek(currentDay)})</p>
+                        <p className="text-sm text-amber-700">Encouragement: You are in the first 107 days. Logged drinks are considered **Exceptions**.</p>
                     </div>
                 )}
-            </section>
-            
-            <section className="mb-8">
-                <h2 className="text-xl font-bold mb-4 text-emerald-800">Weekly Log (Friday-Thursday)</h2>
-                <div className="overflow-x-auto bg-white rounded-xl shadow-xl">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Week #</th>
-                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
-                                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Drinks</th>
-                                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {sortedWeeks.length === 0 ? (
-                                <tr>
-                                    <td colSpan="4" className="p-4 text-center text-gray-500 italic">No logs found yet.</td>
-                                </tr>
-                            ) : (
-                                sortedWeeks.map((weekKey) => {
-                                    const week = weeklyData[weekKey];
-                                    const endDate = new Date(week.startDate);
-                                    endDate.setUTCDate(week.startDate.getUTCDate() + 6);
-                                    const isOver = week.totalDrinks > goalDrinksPerWeek;
-                                    const isCurrentWeek = getCalendarWeek(new Date()) === week.calendarWeekNumber;
-                                    const weekLabel = week.isSabbatical 
-                                        ? `Sabbatical Wk ${week.calendarWeekNumber}` 
-                                        : `Wk ${week.calendarWeekNumber}`;
 
-                                    return (
-                                        <tr key={weekKey} className={`transition duration-100 ${isCurrentWeek ? 'bg-emerald-100 font-semibold' : 'hover:bg-emerald-50'}`}>
-                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{weekLabel}</td>
-                                            <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500">
-                                                {weekKey.slice(5)} - {formatDate(endDate).slice(5)}
-                                            </td>
-                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-right">
-                                                <span className={`font-bold ${week.totalDrinks > 0 && isOver && !week.isSabbatical ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                    {week.totalDrinks}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-right">
-                                                {week.isSabbatical ? (
-                                                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-800">
-                                                        Exception
+                <section className="mb-8 p-4 bg-white/90 backdrop-blur-md rounded-xl shadow-xl border border-emerald-100">
+                    <h2 className="text-lg font-bold mb-4 text-emerald-800">Log Daily Consumption (1 Drink = 1 Dram)</h2>
+                    <div className="grid grid-cols-2 gap-4 items-end">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={handleDateChange}
+                                className="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 bg-white/80"
+                                max={formatDate(new Date())}
+                            />
+                        </div>
+                        
+                        {/* Dram Input with Buttons */}
+                        <div className="text-center">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Drams/Drinks Consumed</label>
+                            <div className="flex justify-between items-center space-x-2">
+                                <button
+                                    onClick={handleDecrement}
+                                    className="p-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full shadow-md transition duration-150 active:bg-gray-400 disabled:opacity-50"
+                                    disabled={currentDrinks <= 0}
+                                    aria-label="Decrement drinks"
+                                >
+                                    <Minus className="w-5 h-5" />
+                                </button>
+
+                                <div className="flex-grow text-center">
+                                    <span className="text-4xl font-extrabold text-emerald-800 tabular-nums">
+                                        {currentDrinks}
+                                    </span>
+                                </div>
+
+                                <button
+                                    onClick={handleIncrement}
+                                    className="p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-md transition duration-150 active:bg-emerald-700"
+                                    aria-label="Increment drinks"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button
+                        onClick={handleSaveLog}
+                        className="mt-5 w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold text-lg shadow-lg hover:bg-emerald-700 transition duration-150 transform hover:scale-[1.01]"
+                    >
+                        {dailyLog[selectedDate] ? `Overwrite Log with ${currentDrinks} Drinks` : `Save ${currentDrinks} Drinks`}
+                    </button>
+                </section>
+                
+                <section className="mb-8">
+                    <h2 className="text-xl font-bold mb-4 text-emerald-900 drop-shadow-sm">
+                        Pacing Metrics
+                    </h2>
+                    
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                        <MetricCard
+                            title="Avg / Week"
+                            value={metrics.pacingAvgPerWeek.toFixed(2)}
+                            unit={`vs ${goalDrinksPerWeek.toFixed(1)} goal`}
+                            icon={Calculator}
+                            colorClass="bg-white/85"
+                        />
+                        <MetricCard
+                            title="Bottle Pace"
+                            value={metrics.bottlesProjected.toFixed(2)}
+                            unit="Annual Pacing"
+                            icon={Wine}
+                            // --- FIX: Use metrics.totalGoalBottles ---
+                            colorClass={metrics.bottlesProjected > metrics.totalGoalBottles ? 'bg-red-100/90' : 'bg-emerald-100/90'}
+                        />
+                        <MetricCard
+                            title="Total Consumed"
+                            // --- FIX: Use metrics.trackingPeriodDrinks ---
+                            value={metrics.trackingPeriodDrinks}
+                            unit=""
+                            icon={CalendarCheck}
+                            colorClass="bg-white/85"
+                        />
+                    </div>
+                    
+                    {/* Reserve Pill (Float above liquid) */}
+                    <div className="flex justify-center w-full">
+                         <div className="w-1/2">
+                            <ReservePill 
+                                value={metrics.drinksOnReserve} 
+                                unit="Drinks" 
+                            />
+                        </div>
+                    </div>
+
+                    {metrics.sabbaticalExceptions > 0 && (
+                         <div className="mt-4 p-3 bg-amber-100/90 border-l-4 border-amber-500 rounded-xl shadow-sm backdrop-blur-sm">
+                            <p className="font-bold text-amber-700">Sabbatical Exceptions: {metrics.sabbaticalExceptions} Drinks</p>
+                            <p className="text-xs text-amber-600">These were logged during the first 107 days.</p>
+                        </div>
+                    )}
+                </section>
+                
+                <section className="mb-20">
+                    <h2 className="text-xl font-bold mb-4 text-emerald-900 drop-shadow-sm">Weekly Log (Friday-Thursday)</h2>
+                    <div className="overflow-x-auto bg-white/90 backdrop-blur-md rounded-xl shadow-xl border border-emerald-100">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50/50">
+                                <tr>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Week #</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
+                                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Drinks</th>
+                                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-transparent divide-y divide-gray-200">
+                                {sortedWeeks.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="4" className="p-4 text-center text-gray-500 italic">No logs found yet.</td>
+                                    </tr>
+                                ) : (
+                                    sortedWeeks.map((weekKey) => {
+                                        const week = weeklyData[weekKey];
+                                        const endDate = new Date(week.startDate);
+                                        endDate.setUTCDate(week.startDate.getUTCDate() + 6);
+                                        const isOver = week.totalDrinks > goalDrinksPerWeek;
+                                        const isCurrentWeek = getCalendarWeek(new Date()) === week.calendarWeekNumber;
+                                        const weekLabel = week.isSabbatical 
+                                            ? `Sabbatical Wk ${week.calendarWeekNumber}` 
+                                            : `Wk ${week.calendarWeekNumber}`;
+
+                                        return (
+                                            <tr key={weekKey} className={`transition duration-100 ${isCurrentWeek ? 'bg-emerald-100/50 font-semibold' : 'hover:bg-emerald-50/50'}`}>
+                                                <td className="px-3 py-3 whitespace-nowLrap text-sm text-gray-900">{weekLabel}</td>
+                                                <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500">
+                                                    {weekKey.slice(5)} - {formatDate(endDate).slice(5)}
+                                                </td>
+                                                <td className="px-3 py-3 whitespace-nowrap text-sm text-right">
+                                                    <span className={`font-bold ${week.totalDrinks > 0 && isOver && !week.isSabbatical ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                        {week.totalDrinks}
                                                     </span>
-                                                ) : (
-                                                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${isOver ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                                        {isOver ? 'Over Goal' : 'Under Goal'}
-                                                    </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+                                                </td>
+                                                <td className="px-3 py-3 whitespace-nowrap text-sm text-right">
+                                                    {week.isSabbatical ? (
+                                                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-800">
+                                                            Exception
+                                                        </span>
+                                                    ) : (
+                                                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${isOver ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                                            {isOver ? 'Over Goal' : 'Under Goal'}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div>
         </div>
     );
 }
-
 // --- Mount the App ---
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
