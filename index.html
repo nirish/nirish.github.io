@@ -130,6 +130,65 @@ const isSabbatical = (date) => getDayOfYear(date) <= DAYS_IN_SABBATICAL;
 
 const formatDate = (date) => date.toISOString().split('T')[0];
 
+// --- COMPONENT: Full Screen Liquid Background (Seamless Loop Fix) ---
+const BackgroundLiquid = ({ percent }) => {
+    const fillHeight = Math.min(Math.max(percent, 0), 100);
+    
+    // This is one SVG wave. We will duplicate it.
+    const WaveSvg = ({fillClass}) => (
+        <svg viewBox="0 0 500 150" preserveAspectRatio="none" className={`h-full w-full ${fillClass}`}>
+            <path d="M0.00,49.98 C150.00,80.00 350.00,20.00 500.00,49.98 L500.00,150.00 L0.00,150.00 Z"></path>
+        </svg>
+    );
+
+    return (
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-gray-50">
+            {/* The Liquid Container */}
+            <div 
+                className="absolute bottom-0 left-0 right-0 transition-all duration-[2000ms] ease-in-out"
+                style={{ height: `${fillHeight}%` }}
+            >
+                {/* Deep Liquid Fill (Sits BELOW the waves to hide the bottom edge) */}
+                <div className="absolute inset-0 top-6 bg-amber-500/40"></div>
+
+                {/* Wave 1 (Back Layer - Slower) 
+                    This div is 200% wide and contains TWO SVGs.
+                */}
+                <div className="absolute top-0 left-0 w-[200%] h-24 -mt-12 opacity-40 animate-wave-slow flex">
+                     <WaveSvg fillClass="fill-amber-600" />
+                     <WaveSvg fillClass="fill-amber-600" />
+                </div>
+
+                {/* Wave 2 (Front Layer - Faster)
+                    This div is 200% wide and contains TWO SVGs.
+                */}
+                <div className="absolute top-0 left-0 w-[200%] h-20 -mt-8 opacity-50 animate-wave flex">
+                     <WaveSvg fillClass="fill-amber-500" />
+                     <WaveSvg fillClass="fill-amber-500" />
+                </div>
+            </div>
+
+             {/* Custom Style for Wave Animation */}
+            <style>{`
+                @keyframes wave {
+                    0% { transform: translateX(0); }
+                    100% { transform: translateX(-50%); } /* Moves left by 100vw (half of its 200vw width) */
+                }
+                 @keyframes wave-slow {
+                    0% { transform: translateX(-50%); } /* Starts offset */
+                    100% { transform: translateX(0); } /* Moves right to its start */
+                }
+                .animate-wave {
+                    animation: wave 12s linear infinite;
+                }
+                 .animate-wave-slow {
+                    animation: wave-slow 18s linear infinite;
+                }
+            `}</style>
+        </div>
+    );
+};
+        
 // --- Main Logic Hook ---
 const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => { 
     const today = useMemo(() => {
