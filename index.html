@@ -87,7 +87,22 @@
     <script type="text/babel">
 // Get React functions from the window
 const { useState, useEffect, useMemo, useCallback, Fragment } = React;
-// We no longer get icons from LucideReact, we will call a function instead.
+// We now use global access for Firebase modules
+const initializeApp = firebase.initializeApp;
+const getAuth = firebase.auth;
+const GoogleAuthProvider = firebase.auth.GoogleAuthProvider;
+const signInWithPopup = firebase.auth.signInWithPopup;
+const signOut = firebase.auth.signOut;
+const onAuthStateChanged = firebase.auth.onAuthStateChanged;
+const getFirestore = firebase.firestore;
+const doc = (db, path) => { /* Placeholder for v9 doc function */ };
+const setDoc = (ref, data, options) => ref.set(data, options); // v8 compat
+const collection = (db, path) => db.collection(path); // v8 compat
+const query = (colRef) => colRef; // v8 compat
+const onSnapshot = (ref, callback, errorCallback) => ref.onSnapshot(callback, errorCallback); // v8 compat
+const getDocs = (query) => query.get(); // v8 compat
+const deleteDoc = (docRef) => docRef.delete(); // v8 compat
+
 
 // --- Global Constants ---
 const DAYS_IN_SABBATICAL = 107;
@@ -110,7 +125,6 @@ const firebaseConfig = {
 };
 
 // --- Initialize Firebase (v8 Compat syntax) ---
-// We get 'firebase' from the script loaded in the <head>
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
@@ -206,9 +220,9 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
     const elapsedTrackingWeeks = useMemo(() => getElapsedTrackingWeeks(pacingReferenceDate), [pacingReferenceDate]);
 
     const metrics = useMemo(() => {
-        let totalDrinksConsumed = 0; // Total all year
+        let totalDrinksConsumed = 0;
         let sabbaticalExceptions = 0;
-        let trackingPeriodDrinks = 0; // Only drinks *after* sabbatical
+        let trackingPeriodDrinks = 0;
         
         const totalGoalDrinksFloat = goalDrinksPerWeek * TOTAL_TRACKING_WEEKS;
         const totalGoalBottlesFloat = (totalGoalDrinksFloat * DRINK_VOLUME_ML) / BOTTLE_VOLUME_ML;
@@ -217,7 +231,7 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
         const totalGoalBottles = round(totalGoalBottlesFloat);
         
         Object.values(dailyLog).forEach(entry => {
-            totalDrinksConsumed += entry.drinks; // This is total for the year
+            totalDrinksConsumed += entry.drinks;
             const date = new Date(entry.date + 'T00:00:00Z'); 
             
             if (isSabbatical(date)) {
@@ -225,7 +239,7 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
                     sabbaticalExceptions += entry.drinks;
                 }
             } else {
-                trackingPeriodDrinks += entry.drinks; // Only count post-sabbatical drinks
+                trackingPeriodDrinks += entry.drinks;
             }
         });
         
@@ -243,21 +257,20 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
             ? (trackingPeriodDrinks / totalGoalDrinks) * 100
             : (trackingPeriodDrinks > 0 ? 100 : 0); 
         
-        // Sabbatical exceptions now count against the reserve
         const drinksReserve = totalGoalDrinks - trackingPeriodDrinks - sabbaticalExceptions;
         
         return {
             totalGoalDrinks,
             totalGoalBottles,
-            totalDrinksConsumed, // This is total for the year
-            elapsedTrackingWeeks, // Correct elapsed weeks (1-37)
+            totalDrinksConsumed,
+            elapsedTrackingWeeks,
             pacingAvgPerWeek,
             bottlesProjected,
             percentOfGoal, 
-            drinksOnReserve: Math.round(drinksReserve), // This now includes the sabbatical penalty
+            drinksOnReserve: Math.round(drinksReserve),
             projectedAnnualDrinks: Math.round(totalProjectedDrinks),
             sabbaticalExceptions,
-            trackingPeriodDrinks: trackingPeriodDrinks, // The official number for pacing
+            trackingPeriodDrinks: trackingPeriodDrinks,
         };
         
     }, [dailyLog, elapsedTrackingWeeks, goalDrinksPerWeek, lastLogDateString]); 
@@ -267,12 +280,12 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
 
 // --- HELPER FUNCTION: Calculate Pacing Zones ---
 const calculateWeeklyPacing = (weeklyData, goalDrinksPerWeek) => {
-    const sortedWeekKeys = Object.keys(weeklyData).sort(); // Sort chronologically
+    const sortedWeekKeys = Object.keys(weeklyData).sort();
     
     let cumulativeTrackingDrinks = 0;
     let elapsedTrackingWeeks = 0;
     
-    const pacedWeeklyData = { ...weeklyData }; // Create a new object
+    const pacedWeeklyData = { ...weeklyData };
 
     for (const weekKey of sortedWeekKeys) {
         const week = pacedWeeklyData[weekKey];
@@ -285,32 +298,28 @@ const calculateWeeklyPacing = (weeklyData, goalDrinksPerWeek) => {
                 break; 
             }
         }
-        week.isBingeWeek = isBingeWeek; // Store for rendering
+        week.isBingeWeek = isBingeWeek;
         // --- End Binge Detection ---
 
-        
-        // Skip sabbatical weeks, they don't affect pacing
         if (week.isSabbatical) {
             week.status = 'Exception'; 
             week.color = 'amber';
             continue;
         }
 
-        // It's a tracking week
         elapsedTrackingWeeks++;
         cumulativeTrackingDrinks += week.totalDrinks;
         
         const cumulativeGoal = elapsedTrackingWeeks * goalDrinksPerWeek;
         const weeklyReserve = cumulativeGoal - cumulativeTrackingDrinks;
         
-        // Apply "Zone" logic based on cumulative reserve
         if (weeklyReserve < 0) {
             week.status = 'Ease Up';
             week.color = 'red';
         } else if (weeklyReserve <= 5) {
             week.status = 'On Track';
             week.color = 'amber';
-        } else { // weeklyReserve > 5
+        } else {
             week.status = 'Extra Sober';
             week.color = 'green';
         }
@@ -321,6 +330,7 @@ const calculateWeeklyPacing = (weeklyData, goalDrinksPerWeek) => {
 
 // --- Main App Component ---
 function App() {
+    // --- 1. STATE HOOKS (Unconditional) ---
     const [userId, setUserId] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -333,90 +343,60 @@ function App() {
     const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
     const [currentDrinks, setCurrentDrinks] = useState(0);
 
-    // 1. Firebase Authentication & Setup
-    useEffect(() => {
-        const setupAuth = async () => {
-            try {
-                await auth.signInAnonymously();
-            } catch (error) {
-                console.error("Auth error:", error);
-            }
-        };
+    // --- 2. MEMO/PROVIDER HOOKS (Unconditional) ---
+    const googleProvider = useMemo(() => new GoogleAuthProvider(), []);
+    const metrics = useTrackerMetrics(dailyLog, goalDrinksPerWeek);
 
-        const unsubscribe = auth.onAuthStateChanged((user) => {
-            if (user) {
-                setUserId(user.uid);
-            } else {
-                setUserId(null);
+    // --- 3. WEEKLY DATA HOOKS (Unconditional) ---
+    const getWeeklyData = useCallback(() => {
+        const weeks = {};
+        const dates = Object.keys(dailyLog).sort();
+        dates.forEach(dateStr => {
+            const date = new Date(dateStr + 'T00:00:00Z'); 
+            let currentDayOfWeek = date.getUTCDay();
+            let daysToFriday = currentDayOfWeek <= 4 ? currentDayOfWeek + 2 : currentDayOfWeek - 5;
+            const fridayDate = new Date(date);
+            fridayDate.setUTCDate(date.getUTCDate() - daysToFriday);
+            const weekKey = formatDate(fridayDate);
+            const calendarWeek = getCalendarWeek(date);
+
+            if (!weeks[weekKey]) {
+                weeks[weekKey] = {
+                    startDate: fridayDate,
+                    totalDrinks: 0,
+                    days: {},
+                    calendarWeekNumber: calendarWeek,
+                    isSabbatical: isSabbatical(date) 
+                };
             }
-            setIsAuthReady(true);
+            const logEntry = dailyLog[dateStr];
+            weeks[weekKey].totalDrinks += logEntry.drinks;
+            weeks[weekKey].days[dateStr] = logEntry.drinks;
         });
-
-        setupAuth();
-        return () => unsubscribe();
-    }, []);
-
-    // 2. Firestore Listener for Goal Settings
-    useEffect(() => {
-        if (!isAuthReady || !userId) return;
-        const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
-        const unsubscribe = goalDocRef.onSnapshot((docSnapshot) => {
-            if (docSnapshot.exists) {
-                const data = docSnapshot.data();
-                const newGoal = parseFloat(data.goalDrinksPerWeek) || DEFAULT_GOAL; 
-                setGoalDrinksPerWeek(newGoal);
-                setTempGoalInput(newGoal);
-            } else {
-                setGoalDrinksPerWeek(DEFAULT_GOAL);
-                setTempGoalInput(DEFAULT_GOAL);
-            }
-            setLoading(false);
-        }, (error) => {
-            console.error("Error listening to goals:", error);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, [isAuthReady, userId]);
-
-    // 3. Firestore Listener for Daily Log
-    useEffect(() => {
-        if (!isAuthReady || !userId) return;
-        const logCollectionRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`);
-        const unsubscribe = logCollectionRef.onSnapshot((snapshot) => {
-            const newLog = {};
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                newLog[data.date] = data;
-            });
-            setDailyLog(newLog);
-            const logEntry = newLog[selectedDate];
-            if (logEntry) {
-                setCurrentDrinks(logEntry.drinks);
-            } else if (!newLog[selectedDate]) {
-                setCurrentDrinks(0);
-            }
-        }, (error) => {
-            console.error("Error listening to log:", error);
-        });
-        return () => unsubscribe();
-    }, [isAuthReady, userId, selectedDate]);
-
-    // Update currentDrinks when selectedDate changes
-    useEffect(() => {
-        const logEntry = dailyLog[selectedDate];
-        setCurrentDrinks(logEntry ? logEntry.drinks : 0);
-    }, [selectedDate, dailyLog]);
+        return weeks;
+    }, [dailyLog]);
     
-    // Icon Rendering Effect
-    useEffect(() => {
-        if (window.lucide) {
-            window.lucide.createIcons();
+    const weeklyData = useMemo(() => getWeeklyData(), [dailyLog]);
+    const pacedWeeklyData = useMemo(() => calculateWeeklyPacing(weeklyData, goalDrinksPerWeek), [weeklyData, goalDrinksPerWeek]);
+    const sortedWeeks = useMemo(() => Object.keys(pacedWeeklyData).sort().reverse(), [pacedWeeklyData]);
+
+    // --- 4. CALLBACK HOOKS (Unconditional) ---
+    const handleGoogleSignIn = useCallback(async () => {
+        try {
+            await signInWithPopup(auth, googleProvider);
+        } catch (error) {
+            console.error("Google Sign-In Failed:", error);
         }
-    }, [loading, isGoalCollapsed, metrics]); // Re-run when state changes
-    
-    const metrics = useTrackerMetrics(dailyLog, goalDrinksPerWeek); 
+    }, [auth, googleProvider]);
 
-    // --- Actions ---
+    const handleSignOut = useCallback(async () => {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error("Sign Out Failed:", error);
+        }
+    }, [auth]);
+
     const handleDateChange = (e) => setSelectedDate(e.target.value);
     const handleIncrement = () => setCurrentDrinks(prev => prev + 1);
     const handleDecrement = () => setCurrentDrinks(prev => Math.max(0, prev - 1));
@@ -478,74 +458,71 @@ function App() {
         }
     }, [userId]);
 
-    // --- UI Components ---
-    const MetricCard = ({ title, value, unit, icon, colorClass = 'bg-white/60' }) => (
-        <div className={`p-3 rounded-xl shadow-lg flex flex-col items-center justify-center ${colorClass} backdrop-blur-md text-gray-800 transition duration-300 transform hover:scale-[1.02] border border-opacity-40 border-white`}>
-            <div className="flex items-center space-x-1 mb-1">
-                <i data-lucide={icon} className="w-4 h-4 text-emerald-800 opacity-90"></i>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">{title}</h3>
-            </div>
-            <p className="text-xl font-extrabold text-emerald-900">
-                {value}
-            </p>
-            {unit && <span className="text-[10px] font-medium text-gray-600 mt-0.5">{unit}</span>}
-        </div>
-    );
-    
-    const ReservePill = ({ value, unit }) => {
-        const isOver = value < 0;
-        const sign = value > 0 ? '+' : (value < 0 ? '' : '');
-        const absoluteValue = Math.abs(Math.round(value)); 
-        const colorClass = isOver 
-            ? 'bg-red-700/70 text-white shadow-red-400/50'
-            : 'bg-emerald-600/70 text-white shadow-emerald-400/50';
-
-        return (
-            <div className={`p-4 rounded-xl flex flex-col items-center justify-center h-full w-full transition duration-300 shadow-xl backdrop-blur-sm ${colorClass}`}>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider opacity-90 mb-0.5">Reserve</h3>
-                <p className="text-3xl font-extrabold">
-                    {sign}{absoluteValue} 
-                </p>
-                <span className="text-[10px] font-medium opacity-90">{unit}</span>
-            </div>
-        );
-    };
-
-    // --- HOOKS MOVED: All hooks must be called before any early return ---
-    const getWeeklyData = () => {
-        const weeks = {};
-        const dates = Object.keys(dailyLog).sort();
-        dates.forEach(dateStr => {
-            const date = new Date(dateStr + 'T00:00:00Z'); 
-            let currentDayOfWeek = date.getUTCDay();
-            let daysToFriday = currentDayOfWeek <= 4 ? currentDayOfWeek + 2 : currentDayOfWeek - 5;
-            const fridayDate = new Date(date);
-            fridayDate.setUTCDate(date.getUTCDate() - daysToFriday);
-            const weekKey = formatDate(fridayDate);
-            const calendarWeek = getCalendarWeek(date);
-
-            if (!weeks[weekKey]) {
-                weeks[weekKey] = {
-                    startDate: fridayDate,
-                    totalDrinks: 0,
-                    days: {}, // Store daily drink counts
-                    calendarWeekNumber: calendarWeek,
-                    isSabbatical: isSabbatical(date) 
-                };
+    // --- 5. EFFECT HOOKS (Unconditional) ---
+    useEffect(() => {
+        if (!auth) { setLoading(false); return; }
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setUserId(user.uid);
+                setLoading(false);
+            } else {
+                setUserId(null);
+                setLoading(false);
             }
-            const logEntry = dailyLog[dateStr];
-            weeks[weekKey].totalDrinks += logEntry.drinks;
-            weeks[weekKey].days[dateStr] = logEntry.drinks; // Store drink count for the day
+            setIsAuthReady(true);
         });
-        return weeks;
-    };
+        return () => unsubscribe();
+    }, [auth]);
+
+    useEffect(() => {
+        if (!isAuthReady || !userId) return;
+        const goalDocRef = db.collection(`artifacts/${appId}/users/${userId}/settings`).doc('goals');
+        const unsubscribe = goalDocRef.onSnapshot((docSnapshot) => {
+            if (docSnapshot.exists) {
+                const data = docSnapshot.data();
+                const newGoal = parseFloat(data.goalDrinksPerWeek) || DEFAULT_GOAL; 
+                setGoalDrinksPerWeek(newGoal);
+                setTempGoalInput(newGoal);
+            } else {
+                setGoalDrinksPerWeek(DEFAULT_GOAL);
+                setTempGoalInput(DEFAULT_GOAL);
+            }
+        }, (error) => { console.error("Error listening to goals:", error); });
+        return () => unsubscribe();
+    }, [isAuthReady, userId]);
+
+    useEffect(() => {
+        if (!isAuthReady || !userId) return;
+        const logCollectionRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`);
+        const unsubscribe = logCollectionRef.onSnapshot((snapshot) => {
+            const newLog = {};
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                newLog[data.date] = data;
+            });
+            setDailyLog(newLog);
+            const logEntry = newLog[selectedDate];
+            if (logEntry) {
+                setCurrentDrinks(logEntry.drinks);
+            } else if (!newLog[selectedDate]) {
+                setCurrentDrinks(0);
+            }
+        }, (error) => { console.error("Error listening to log:", error); });
+        return () => unsubscribe();
+    }, [isAuthReady, userId, selectedDate]);
+
+    useEffect(() => {
+        const logEntry = dailyLog[selectedDate];
+        setCurrentDrinks(logEntry ? logEntry.drinks : 0);
+    }, [selectedDate, dailyLog]);
     
-    const weeklyData = useMemo(() => getWeeklyData(), [dailyLog]);
-    const pacedWeeklyData = useMemo(() => calculateWeeklyPacing(weeklyData, goalDrinksPerWeek), [weeklyData, goalDrinksPerWeek]);
-    const sortedWeeks = useMemo(() => Object.keys(pacedWeeklyData).sort().reverse(), [pacedWeeklyData]);
-    // --- END HOOKS MOVED ---
+    useEffect(() => {
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    }, [loading, isGoalCollapsed, metrics]);
 
-
+    // --- RENDER GATES ---
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -553,11 +530,39 @@ function App() {
             </div>
         );
     }
+
+    if (!userId) {
+        return (
+            <div className="min-h-screen font-sans relative flex items-center justify-center p-8">
+                <BackgroundLiquid percent={0} />
+                <div className="relative z-10 p-6 bg-white/90 backdrop-blur-md rounded-xl shadow-2xl max-w-sm text-center">
+                    <Flame className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-emerald-900 mb-4">Sober*ish Tracker</h2>
+                    <p className="text-sm text-gray-600 mb-6">
+                        Please sign in to securely save your goals and consumption history across all your devices.
+                    </p>
+                    <button
+                        onClick={handleGoogleSignIn}
+                        className="w-full flex items-center justify-center bg-emerald-600 text-white py-3 rounded-lg font-semibold text-lg shadow-lg hover:bg-emerald-700 transition duration-150"
+                    >
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white" className="mr-2">
+                            <path d="M12.0003 12.7214C12.0003 13.5658 12.0623 14.3411 12.2272 15.0898H11.9984C9.56947 15.0898 7.62534 13.1466 7.62534 10.7186C7.62534 8.28976 9.56947 6.34657 11.9984 6.34657C13.2505 6.34657 14.383 6.78601 15.2536 7.6062L16.7118 6.13605C15.6025 5.02678 13.9167 4.34657 11.9984 4.34657C8.45524 4.34657 5.59961 7.20221 5.59961 10.7454C5.59961 14.2886 8.45524 17.1442 11.9984 17.1442C15.5416 17.1442 18.3972 14.2886 18.3972 10.7454C18.3972 10.4285 18.3582 10.1116 18.2982 9.80373H11.9984V12.7214Z" fill="white"/>
+                        </svg>
+                        Sign in with Google
+                    </button>
+                    <p className="mt-4 text-xs text-gray-500">
+                        Your data is secured by your Google account.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+    // --- END AUTHENTICATION GATE ---
     
     const currentDay = new Date(selectedDate + 'T00:00:00Z');
     
     return (
-        <div className="min-h-screen font-sans relative"> 
+        <div className="min-h-screen font-sans relative">
             
             <BackgroundLiquid percent={metrics.percentOfGoal} />
 
@@ -565,11 +570,18 @@ function App() {
                 
                 <header className="py-4 mb-6 border-b border-amber-300/50 flex justify-between items-center">
                     <h1 className="text-3xl font-extrabold text-emerald-900 flex items-center drop-shadow-sm">
-                        <i data-lucide="flame" className="w-8 h-8 mr-2 text-amber-600"></i>
+                        <Flame className="w-8 h-8 mr-2 text-amber-600" />
                         Sober*ish
                     </h1>
                     
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end">
+                        <button 
+                            onClick={handleSignOut} 
+                            className="text-xs text-red-500 hover:text-red-700 mb-2 flex items-center p-1 rounded-full bg-white/50 backdrop-blur-sm shadow-sm"
+                            aria-label="Sign out"
+                        >
+                            <LogOut className="w-3 h-3 mr-1" /> Sign Out
+                        </button>
                         <p className="text-xs text-emerald-900 font-semibold drop-shadow-sm">
                             {goalDrinksPerWeek.toFixed(2)} <span className="text-gray-700 font-normal">drinks/week</span>
                         </p>
@@ -585,9 +597,9 @@ function App() {
                 <section className="mb-8 p-4 bg-white/70 backdrop-blur-md rounded-xl shadow-xl border border-emerald-100">
                     <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsGoalCollapsed(!isGoalCollapsed)}>
                         <h2 className="text-lg font-bold text-emerald-800 flex items-center">
-                            <i data-lucide="goal" className="w-5 h-5 mr-2 text-emerald-600"></i> Annual Goal Setting
+                            <Goal className="w-5 h-5 mr-2 text-emerald-600" /> Annual Goal Setting
                         </h2>
-                        {isGoalCollapsed ? <i data-lucide="chevron-down" className="w-5 h-5 text-emerald-600"></i> : <i data-lucide="chevron-up" className="w-5 h-5 text-emerald-600"></i>}
+                        {isGoalCollapsed ? <ChevronDown className="w-5 h-5 text-emerald-600" /> : <ChevronUp className="w-5 h-5 text-emerald-600" />}
                     </div>
 
                     {!isGoalCollapsed && (
@@ -597,19 +609,19 @@ function App() {
                                 <MetricCard
                                     title="Goal / Week"
                                     value={goalDrinksPerWeek.toFixed(2)}
-                                    icon="calculator"
+                                    icon={Calculator}
                                     colorClass="bg-white/60"
                                 />
                                 <MetricCard
                                     title="Annual Drinks"
                                     value={metrics.totalGoalDrinks} 
-                                    icon="goal"
+                                    icon={Goal}
                                     colorClass="bg-white/60"
                                 />
                                 <MetricCard
                                     title="Annual Bottles"
                                     value={metrics.totalGoalBottles.toFixed(2)} 
-                                    icon="wine"
+                                    icon={Wine}
                                     colorClass="bg-white/60"
                                 />
                             </div>
@@ -638,7 +650,7 @@ function App() {
                                     onClick={handleResetData}
                                     className="w-full flex items-center justify-center bg-gray-200 text-red-600 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-300 transition duration-150"
                                 >
-                                    <i data-lucide="trash-2" className="w-4 h-4 mr-2"></i>
+                                    <Trash2 className="w-4 h-4 mr-2" />
                                     Reset All Data (Log & Goal)
                                 </button>
                                 <p className="text-xs text-gray-500 mt-2 text-center">
@@ -649,14 +661,11 @@ function App() {
                     )}
                 </section>
                 
-                {/* --- REMOVED: Sabbatical Period Active notice --- */}
-
                 <section className="mb-8 p-4 bg-white/70 backdrop-blur-md rounded-xl shadow-xl border border-emerald-100">
                     <h2 className="text-lg font-bold mb-4 text-emerald-800">Log Daily Consumption</h2>
                     
                     <div className="flex gap-4">
                         
-                        {/* Left Column: Logging Inputs (Takes 2/3 width) */}
                         <div className="w-2/3 space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
@@ -678,25 +687,26 @@ function App() {
                                         disabled={currentDrinks <= 0}
                                         aria-label="Decrement drinks"
                                     >
-                                        <i data-lucide="minus" className="w-5 h-5"></i>
+                                        <Minus className="w-5 h-5" />
                                     </button>
+
                                     <div className="flex-grow text-center">
                                         <span className="text-4xl font-extrabold text-emerald-800 tabular-nums">
                                             {currentDrinks}
                                         </span>
                                     </div>
+
                                     <button
                                         onClick={handleIncrement}
                                         className="p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-md transition duration-150 active:bg-emerald-700"
                                         aria-label="Increment drinks"
                                     >
-                                        <i data-lucide="plus" className="w-5 h-5"></i>
+                                        <Plus className="w-5 h-5" />
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Right Column: Reserve Pill (Takes 1/3 width) */}
                         <div className="w-1/3 flex items-stretch justify-center">
                             <ReservePill 
                                 value={metrics.drinksOnReserve} 
@@ -723,27 +733,24 @@ function App() {
                             title="Avg / Week"
                             value={metrics.pacingAvgPerWeek.toFixed(2)}
                             unit={`vs ${goalDrinksPerWeek.toFixed(1)} goal`}
-                            icon="calculator"
+                            icon={Calculator}
                             colorClass="bg-white/60"
                         />
                         <MetricCard
                             title="Bottle Pace"
                             value={metrics.bottlesProjected.toFixed(2)}
                             unit="Annual Pacing"
-                            icon="wine"
+                            icon={Wine}
                             colorClass={metrics.bottlesProjected > metrics.totalGoalBottles ? 'bg-red-100/70' : 'bg-emerald-100/70'}
                         />
                         <MetricCard
                             title="Total Consumed"
                             value={metrics.totalDrinksConsumed}
                             unit=""
-                            icon="calendar-check"
+                            icon={CalendarCheck}
                             colorClass="bg-white/60"
                         />
                     </div>
-                    
-                    {/* --- REMOVED: Reserve Pill container --- */}
-                    {/* --- REMOVED: Sabbatical Exceptions notice --- */}
                 </section>
                 
                 <section className="mb-20">
@@ -765,16 +772,15 @@ function App() {
                                     </tr>
                                 ) : (
                                     sortedWeeks.map((weekKey) => {
-                                        const week = pacedWeeklyData[weekKey]; // Use paced data
+                                        const week = pacedWeeklyData[weekKey];
                                         const endDate = new Date(week.startDate);
                                         endDate.setUTCDate(week.startDate.getUTCDate() + 6);
-                                        const isOver = week.totalDrinks > goalDrinksPerWeek; // Still useful for drink number color
+                                        const isOver = week.totalDrinks > goalDrinksPerWeek;
                                         const isCurrentWeek = getCalendarWeek(new Date()) === week.calendarWeekNumber;
                                         const weekLabel = week.isSabbatical 
                                             ? `Sabbatical Wk ${week.calendarWeekNumber}` 
                                             : `Wk ${week.calendarWeekNumber}`;
 
-                                        // --- NEW: Define status and color based on pacing logic ---
                                         let statusText = '';
                                         let statusColorClass = '';
                                         
@@ -782,17 +788,16 @@ function App() {
                                             statusText = 'Exception';
                                             statusColorClass = 'bg-amber-100 text-amber-800';
                                         } else if (week.color === 'red') {
-                                            statusText = week.status; // 'Ease Up'
+                                            statusText = week.status;
                                             statusColorClass = 'bg-red-100 text-red-800';
                                         } else if (week.color === 'amber') {
-                                            statusText = week.status; // 'On Track'
+                                            statusText = week.status;
                                             statusColorClass = 'bg-amber-100 text-amber-800';
-                                        } else { // green
-                                            statusText = week.status; // 'Extra Sober'
+                                        } else {
+                                            statusText = week.status;
                                             statusColorClass = 'bg-emerald-100 text-emerald-800';
                                         }
                                         
-                                        // --- NEW: Prepend binge emoji if needed ---
                                         const bingeEmoji = week.isBingeWeek ? '🔥 ' : '';
 
                                         return (
@@ -802,13 +807,11 @@ function App() {
                                                     {weekKey.slice(5)} - {formatDate(endDate).slice(5)}
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap text-sm text-right">
-                                                    {/* This logic remains: red if over weekly goal, green if not */}
                                                     <span className={`font-bold ${week.totalDrinks > 0 && isOver && !week.isSabbatical ? 'text-red-600' : 'text-emerald-600'}`}>
                                                         {week.totalDrinks}
                                                     </span>
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap text-sm text-right">
-                                                    {/* --- MODIFIED: Use new status and color --- */}
                                                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColorClass}`}>
                                                         {bingeEmoji}{statusText}
                                                     </span>
@@ -826,6 +829,7 @@ function App() {
         </div>
     );
 }
+
 // --- Mount the App ---
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
