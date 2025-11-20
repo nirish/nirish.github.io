@@ -2,10 +2,6 @@
 const { useState, useEffect, useMemo, useCallback } = React;
 
 // Get Lucide Icons
-// We destructure the specific icons we need from the global 'lucide' object
-// Note: In the browser build, icon names might be lowercase properties of the 'lucide.icons' object, 
-// but 'lucide' global usually exposes createIcons. 
-// For React components using the CDN, we actually need to render <i> tags and call createIcons.
 const { createIcons } = lucide;
 
 // --- Global Constants ---
@@ -20,7 +16,6 @@ const BINGE_THRESHOLD = 4;
 // --- Firebase Setup (V8 Global Syntax) ---
 const db = firebase.firestore();
 const auth = firebase.auth();
-// Your specific App ID path
 const appId = "dram-50c7c"; 
 
 // --- Utility Functions ---
@@ -217,9 +212,22 @@ function App() {
     const pacedWeeklyData = useMemo(() => calculateWeeklyPacing(weeklyData, goalDrinksPerWeek), [weeklyData, goalDrinksPerWeek]);
     const sortedWeeks = useMemo(() => Object.keys(pacedWeeklyData).sort().reverse(), [pacedWeeklyData]);
 
+    // --- UPDATED: Smart Sign-In Handler (Redirect vs Popup) ---
     const handleGoogleSignIn = useCallback(async () => {
-        try { await auth.signInWithPopup(googleProvider); } 
-        catch (error) { console.error("Google Sign-In Failed:", error); }
+        try {
+            // Use Redirect for mobile/PWA (more reliable)
+            // Use Popup for desktop (better UX)
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                await auth.signInWithRedirect(googleProvider);
+            } else {
+                await auth.signInWithPopup(googleProvider);
+            }
+        } catch (error) {
+            console.error("Google Sign-In Failed:", error);
+            alert("Sign in failed: " + error.message);
+        }
     }, [googleProvider]);
 
     const handleSignOut = useCallback(async () => {
@@ -232,7 +240,6 @@ function App() {
 
     const handleSaveLog = useCallback(async () => {
         if (!userId) return;
-        // V8 Syntax: db.collection().doc()
         const docRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`).doc(selectedDate);
         try { await docRef.set({ date: selectedDate, drinks: currentDrinks, timestamp: new Date() }, { merge: true }); } 
         catch (e) { console.error(e); }
@@ -264,10 +271,20 @@ function App() {
 
     // Effects
     useEffect(() => {
-        // V8 Syntax: auth.onAuthStateChanged
         const unsubscribe = auth.onAuthStateChanged((user) => {
             if (user) { setUserId(user.uid); setLoading(false); } 
-            else { setUserId(null); setLoading(false); }
+            else { 
+                // If we just came back from a redirect sign-in, get the result
+                auth.getRedirectResult().then((result) => {
+                    if (result.user) {
+                        setUserId(result.user.uid);
+                    }
+                    setLoading(false);
+                }).catch((error) => {
+                    console.error("Redirect Result Error:", error);
+                    setLoading(false);
+                });
+            }
         });
         return () => unsubscribe();
     }, []);
@@ -305,11 +322,12 @@ function App() {
         setCurrentDrinks(logEntry ? logEntry.drinks : 0);
     }, [selectedDate, dailyLog]);
     
-    // Render Icons using the global lucide object
+    // Render Icons
     useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
     }, [loading, isGoalCollapsed, metrics, sortedWeeks]);
 
+    // Render Gates
     if (loading) return <div className="flex items-center justify-center min-h-screen bg-gray-50 text-emerald-800">Loading...</div>;
 
     if (!userId) {
