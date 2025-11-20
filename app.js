@@ -1,34 +1,37 @@
-// --- PASTE THIS INTO app.js ---
-
+// Get React functions from the global window object
 const { useState, useEffect, useMemo, useCallback } = React;
-const { Wine, CalendarCheck, Zap, Goal, Flame, Calculator, ChevronDown, ChevronUp, Trash2, Minus, Plus, LogOut, User } = lucide;
 
-// --- Global Constants & Firebase Setup ---
-const db = firebase.firestore();
-const auth = firebase.auth();
-const appId = "dram-50c7c"; 
+// Get Lucide Icons
+// We destructure the specific icons we need from the global 'lucide' object
+// Note: In the browser build, icon names might be lowercase properties of the 'lucide.icons' object, 
+// but 'lucide' global usually exposes createIcons. 
+// For React components using the CDN, we actually need to render <i> tags and call createIcons.
+const { createIcons } = lucide;
 
-// The base constants for your tracking goals
-const DAYS_IN_SABBATICAL = 107; 
+// --- Global Constants ---
+const DAYS_IN_SABBATICAL = 107;
 const TOTAL_TRACKING_WEEKS = 37;
-const SABBATICAL_END_WEEK = 15; // Approx. 107 / 7
-const DRINK_VOLUME_ML = 45; 
+const SABBATICAL_END_WEEK = 15;
+const DRINK_VOLUME_ML = 45;
 const BOTTLE_VOLUME_ML = 750;
 const DEFAULT_GOAL = 1.8;
-const BINGE_THRESHOLD = 4; // 4+ drinks is a binge
+const BINGE_THRESHOLD = 4;
 
-// ... (Rest of logic from previous successful step) ...
-// For brevity in this response, ensure you copy the full logic if you haven't already.
-// I will paste the full logic block below to be safe.
+// --- Firebase Setup (V8 Global Syntax) ---
+const db = firebase.firestore();
+const auth = firebase.auth();
+// Your specific App ID path
+const appId = "dram-50c7c"; 
 
+// --- Utility Functions ---
 const round = (num) => Math.round(num * 100) / 100;
 
 const getDayOfYear = (date) => {
-  const dateUTC = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const startOfYear = new Date(Date.UTC(dateUTC.getUTCFullYear(), 0, 1));
-  const diff = dateUTC.getTime() - startOfYear.getTime();
-  const oneDay = 1000 * 60 * 60 * 24;
-  return Math.floor(diff / oneDay) + 1;
+    const dateUTC = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const startOfYear = new Date(Date.UTC(dateUTC.getUTCFullYear(), 0, 1));
+    const diff = dateUTC.getTime() - startOfYear.getTime();
+    const oneDay = 1000 * 60 * 60 * 24;
+    return Math.floor(diff / oneDay) + 1;
 };
 
 const getCalendarWeek = (date) => {
@@ -37,27 +40,35 @@ const getCalendarWeek = (date) => {
 };
 
 const getElapsedTrackingWeeks = (date) => {
-  const doy = getDayOfYear(date);
-  if (doy <= DAYS_IN_SABBATICAL) return 0; 
-  const currentWeek = getCalendarWeek(date);
-  const elapsedWeeks = currentWeek - SABBATICAL_END_WEEK;
-  return Math.max(1, Math.min(elapsedWeeks, TOTAL_TRACKING_WEEKS));
+    const doy = getDayOfYear(date);
+    if (doy <= DAYS_IN_SABBATICAL) return 0;
+    const currentWeek = getCalendarWeek(date);
+    const elapsedWeeks = currentWeek - SABBATICAL_END_WEEK;
+    return Math.max(1, Math.min(elapsedWeeks, TOTAL_TRACKING_WEEKS));
 };
 
 const isSabbatical = (date) => getDayOfYear(date) <= DAYS_IN_SABBATICAL;
 
 const formatDate = (date) => date.toISOString().split('T')[0];
 
+// --- Components ---
+
 const BackgroundLiquid = ({ percent }) => {
     const fillHeight = Math.min(Math.max(percent, 0), 100);
+    
+    // Wave SVG component
     const WaveSvg = ({fillClass}) => (
         <svg viewBox="0 0 500 150" preserveAspectRatio="none" className={`h-full w-full ${fillClass}`}>
             <path d="M0.00,49.98 C150.00,80.00 350.00,20.00 500.00,49.98 L500.00,150.00 L0.00,150.00 Z"></path>
         </svg>
     );
+
     return (
         <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-gray-50">
-            <div className="absolute bottom-0 left-0 right-0 transition-all duration-[2000ms] ease-in-out" style={{ height: `${fillHeight}%` }}>
+            <div 
+                className="absolute bottom-0 left-0 right-0 transition-all duration-[2000ms] ease-in-out"
+                style={{ height: `${fillHeight}%` }}
+            >
                 <div className="absolute inset-0 top-6 bg-amber-500/40"></div>
                 <div className="absolute top-0 left-0 w-[200%] h-24 -mt-12 opacity-40 animate-wave-slow flex">
                      <WaveSvg fillClass="fill-amber-600" />
@@ -123,8 +134,8 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
             bottlesProjected = round((totalProjectedDrinks * DRINK_VOLUME_ML) / BOTTLE_VOLUME_ML);
         }
 
-        const percentOfGoal = totalGoalDrinks > 0 ? (totalDrinksConsumed / totalGoalDrinks) * 100 : (totalDrinksConsumed > 0 ? 100 : 0); 
-        const drinksReserve = totalGoalDrinks - totalDrinksConsumed;
+        const percentOfGoal = totalGoalDrinks > 0 ? (trackingPeriodDrinks / totalGoalDrinks) * 100 : (trackingPeriodDrinks > 0 ? 100 : 0); 
+        const drinksReserve = totalGoalDrinks - trackingPeriodDrinks - sabbaticalExceptions;
         
         return {
             totalGoalDrinks,
@@ -221,6 +232,7 @@ function App() {
 
     const handleSaveLog = useCallback(async () => {
         if (!userId) return;
+        // V8 Syntax: db.collection().doc()
         const docRef = db.collection(`artifacts/${appId}/users/${userId}/drink_tracker`).doc(selectedDate);
         try { await docRef.set({ date: selectedDate, drinks: currentDrinks, timestamp: new Date() }, { merge: true }); } 
         catch (e) { console.error(e); }
@@ -250,7 +262,9 @@ function App() {
         catch (e) { console.error(e); }
     }, [userId]);
 
+    // Effects
     useEffect(() => {
+        // V8 Syntax: auth.onAuthStateChanged
         const unsubscribe = auth.onAuthStateChanged((user) => {
             if (user) { setUserId(user.uid); setLoading(false); } 
             else { setUserId(null); setLoading(false); }
@@ -291,9 +305,10 @@ function App() {
         setCurrentDrinks(logEntry ? logEntry.drinks : 0);
     }, [selectedDate, dailyLog]);
     
+    // Render Icons using the global lucide object
     useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
-    }, [loading, isGoalCollapsed, metrics]);
+    }, [loading, isGoalCollapsed, metrics, sortedWeeks]);
 
     if (loading) return <div className="flex items-center justify-center min-h-screen bg-gray-50 text-emerald-800">Loading...</div>;
 
@@ -302,7 +317,7 @@ function App() {
             <div className="min-h-screen font-sans relative flex items-center justify-center p-8">
                 <BackgroundLiquid percent={0} />
                 <div className="relative z-10 p-6 bg-white/90 backdrop-blur-md rounded-xl shadow-2xl max-w-sm text-center">
-                    <Flame className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+                    <i data-lucide="flame" className="w-12 h-12 text-amber-600 mx-auto mb-4"></i>
                     <h2 className="text-2xl font-bold text-emerald-900 mb-4">Sober*ish Tracker</h2>
                     <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center bg-emerald-600 text-white py-3 rounded-lg font-semibold text-lg shadow-lg hover:bg-emerald-700">
                         Sign in with Google
@@ -311,29 +326,6 @@ function App() {
             </div>
         );
     }
-    
-    // --- RENDER ---
-    const MetricCard = ({ title, value, unit, icon, colorClass = 'bg-white/60' }) => (
-        <div className={`p-3 rounded-xl shadow-lg flex flex-col items-center justify-center ${colorClass} backdrop-blur-md text-gray-800 border border-opacity-40 border-white`}>
-            <div className="flex items-center space-x-1 mb-1">
-                <i data-lucide={icon} className="w-4 h-4 text-emerald-800 opacity-90"></i>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">{title}</h3>
-            </div>
-            <p className="text-xl font-extrabold text-emerald-900">{value}</p>
-            {unit && <span className="text-[10px] font-medium text-gray-600 mt-0.5">{unit}</span>}
-        </div>
-    );
-
-    const ReservePill = ({ value, unit }) => {
-        const colorClass = value < 0 ? 'bg-red-700/70' : 'bg-emerald-600/70';
-        return (
-            <div className={`p-4 rounded-xl flex flex-col items-center justify-center h-full w-full shadow-xl backdrop-blur-sm ${colorClass} text-white`}>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider opacity-90 mb-0.5">Reserve</h3>
-                <p className="text-3xl font-extrabold">{value > 0 ? '+' : ''}{value}</p>
-                <span className="text-[10px] font-medium opacity-90">{unit}</span>
-            </div>
-        );
-    };
 
     return (
         <div className="min-h-screen font-sans relative">
@@ -341,10 +333,10 @@ function App() {
             <div className="relative z-10 p-4 max-w-lg mx-auto">
                 <header className="py-4 mb-6 border-b border-amber-300/50 flex justify-between items-center">
                     <h1 className="text-3xl font-extrabold text-emerald-900 flex items-center drop-shadow-sm">
-                        <Flame className="w-8 h-8 mr-2 text-amber-600" /> Sober*ish
+                        <i data-lucide="flame" className="w-8 h-8 mr-2 text-amber-600"></i> Sober*ish
                     </h1>
                     <div className="text-right flex flex-col items-end">
-                        <button onClick={handleSignOut} className="text-xs text-red-500 hover:text-red-700 mb-2 flex items-center p-1 rounded-full bg-white/50 backdrop-blur-sm shadow-sm"><LogOut className="w-3 h-3 mr-1" /> Sign Out</button>
+                        <button onClick={handleSignOut} className="text-xs text-red-500 hover:text-red-700 mb-2 flex items-center p-1 rounded-full bg-white/50 backdrop-blur-sm shadow-sm"><i data-lucide="log-out" className="w-3 h-3 mr-1"></i> Sign Out</button>
                         <p className="text-xs text-emerald-900 font-semibold">{goalDrinksPerWeek.toFixed(2)} <span className="text-gray-700 font-normal">drinks/week</span></p>
                         <p className="text-xs text-emerald-900 font-semibold">{metrics.totalGoalDrinks} <span className="text-gray-700 font-normal">annual drinks</span></p>
                         <p className="text-xs text-emerald-900 font-semibold">{metrics.totalGoalBottles.toFixed(2)} <span className="text-gray-700 font-normal">annual bottles</span></p>
@@ -353,15 +345,24 @@ function App() {
 
                 <section className="mb-8 p-4 bg-white/70 backdrop-blur-md rounded-xl shadow-xl border border-emerald-100">
                     <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsGoalCollapsed(!isGoalCollapsed)}>
-                        <h2 className="text-lg font-bold text-emerald-800 flex items-center"><Goal className="w-5 h-5 mr-2 text-emerald-600" /> Annual Goal Setting</h2>
-                        {isGoalCollapsed ? <ChevronDown className="w-5 h-5 text-emerald-600" /> : <ChevronUp className="w-5 h-5 text-emerald-600" />}
+                        <h2 className="text-lg font-bold text-emerald-800 flex items-center"><i data-lucide="goal" className="w-5 h-5 mr-2 text-emerald-600"></i> Annual Goal Setting</h2>
+                        {isGoalCollapsed ? <i data-lucide="chevron-down" className="w-5 h-5 text-emerald-600"></i> : <i data-lucide="chevron-up" className="w-5 h-5 text-emerald-600"></i>}
                     </div>
                     {!isGoalCollapsed && (
                         <div className="mt-4 pt-3 border-t border-emerald-200">
                             <div className="grid grid-cols-3 gap-3 mb-6">
-                                <MetricCard title="Goal / Week" value={goalDrinksPerWeek.toFixed(2)} icon="calculator" />
-                                <MetricCard title="Annual Drinks" value={metrics.totalGoalDrinks} icon="goal" />
-                                <MetricCard title="Annual Bottles" value={metrics.totalGoalBottles.toFixed(2)} icon="wine" />
+                                <div className="p-3 rounded-xl shadow-lg flex flex-col items-center justify-center bg-white/60 backdrop-blur-md text-gray-800 border border-opacity-40 border-white">
+                                    <div className="flex items-center space-x-1 mb-1"><i data-lucide="calculator" className="w-4 h-4 text-emerald-800 opacity-90"></i><h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Goal / Week</h3></div>
+                                    <p className="text-xl font-extrabold text-emerald-900">{goalDrinksPerWeek.toFixed(2)}</p>
+                                </div>
+                                <div className="p-3 rounded-xl shadow-lg flex flex-col items-center justify-center bg-white/60 backdrop-blur-md text-gray-800 border border-opacity-40 border-white">
+                                    <div className="flex items-center space-x-1 mb-1"><i data-lucide="goal" className="w-4 h-4 text-emerald-800 opacity-90"></i><h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Annual Drinks</h3></div>
+                                    <p className="text-xl font-extrabold text-emerald-900">{metrics.totalGoalDrinks}</p>
+                                </div>
+                                <div className="p-3 rounded-xl shadow-lg flex flex-col items-center justify-center bg-white/60 backdrop-blur-md text-gray-800 border border-opacity-40 border-white">
+                                    <div className="flex items-center space-x-1 mb-1"><i data-lucide="wine" className="w-4 h-4 text-emerald-800 opacity-90"></i><h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Annual Bottles</h3></div>
+                                    <p className="text-xl font-extrabold text-emerald-900">{metrics.totalGoalBottles.toFixed(2)}</p>
+                                </div>
                             </div>
                             <div className="grid grid-cols-3 gap-4 items-end">
                                 <div className="col-span-2">
@@ -371,7 +372,7 @@ function App() {
                                 <button onClick={handleSaveGoal} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-emerald-700 transition duration-150">Update Goal</button>
                             </div>
                              <div className="mt-6">
-                                <button onClick={handleResetData} className="w-full flex items-center justify-center bg-gray-200 text-red-600 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-300 transition duration-150"><Trash2 className="w-4 h-4 mr-2" /> Reset All Data</button>
+                                <button onClick={handleResetData} className="w-full flex items-center justify-center bg-gray-200 text-red-600 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-300 transition duration-150"><i data-lucide="trash-2" className="w-4 h-4 mr-2"></i> Reset All Data</button>
                             </div>
                         </div>
                     )}
@@ -388,22 +389,39 @@ function App() {
                             <div className="text-center">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Drams/Drinks Consumed</label>
                                 <div className="flex justify-between items-center space-x-2">
-                                    <button onClick={handleDecrement} disabled={currentDrinks <= 0} className="p-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full shadow-md"><Minus className="w-5 h-5" /></button>
+                                    <button onClick={handleDecrement} disabled={currentDrinks <= 0} className="p-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full shadow-md"><i data-lucide="minus" className="w-5 h-5"></i></button>
                                     <span className="text-4xl font-extrabold text-emerald-800 tabular-nums">{currentDrinks}</span>
-                                    <button onClick={handleIncrement} className="p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-md"><Plus className="w-5 h-5" /></button>
+                                    <button onClick={handleIncrement} className="p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-md"><i data-lucide="plus" className="w-5 h-5"></i></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="w-1/3 flex items-stretch justify-center"><ReservePill value={metrics.drinksOnReserve} unit="Drinks" /></div>
+                        <div className="w-1/3 flex items-stretch justify-center">
+                            <div className={`p-4 rounded-xl flex flex-col items-center justify-center h-full w-full shadow-xl backdrop-blur-sm ${metrics.drinksOnReserve < 0 ? 'bg-red-700/70' : 'bg-emerald-600/70'} text-white`}>
+                                <h3 className="text-[10px] font-semibold uppercase tracking-wider opacity-90 mb-0.5">Reserve</h3>
+                                <p className="text-3xl font-extrabold">{metrics.drinksOnReserve > 0 ? '+' : ''}{metrics.drinksOnReserve}</p>
+                                <span className="text-[10px] font-medium opacity-90">Drinks</span>
+                            </div>
+                        </div>
                     </div>
                     <button onClick={handleSaveLog} className="mt-5 w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold text-lg shadow-lg hover:bg-emerald-700">Save</button>
                 </section>
                 
                 <section className="mb-8">
                     <div className="grid grid-cols-3 gap-3 mb-4">
-                        <MetricCard title="Avg / Week" value={metrics.pacingAvgPerWeek.toFixed(2)} unit={`vs ${goalDrinksPerWeek.toFixed(1)}`} icon="calculator" />
-                        <MetricCard title="Bottle Pace" value={metrics.bottlesProjected.toFixed(2)} unit="Annual Pacing" icon="wine" colorClass={metrics.bottlesProjected > metrics.totalGoalBottles ? 'bg-red-100/70' : 'bg-emerald-100/70'} />
-                        <MetricCard title="Total Consumed" value={metrics.totalDrinksConsumed} unit="" icon="calendar-check" />
+                        <div className="p-3 rounded-xl shadow-lg flex flex-col items-center justify-center bg-white/60 backdrop-blur-md text-gray-800 border border-opacity-40 border-white">
+                            <div className="flex items-center space-x-1 mb-1"><i data-lucide="calculator" className="w-4 h-4 text-emerald-800 opacity-90"></i><h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Avg / Week</h3></div>
+                            <p className="text-xl font-extrabold text-emerald-900">{metrics.pacingAvgPerWeek.toFixed(2)}</p>
+                            <span className="text-[10px] font-medium text-gray-600 mt-0.5">vs {goalDrinksPerWeek.toFixed(1)}</span>
+                        </div>
+                        <div className={`p-3 rounded-xl shadow-lg flex flex-col items-center justify-center ${metrics.bottlesProjected > metrics.totalGoalBottles ? 'bg-red-100/70' : 'bg-emerald-100/70'} backdrop-blur-md text-gray-800 border border-opacity-40 border-white`}>
+                            <div className="flex items-center space-x-1 mb-1"><i data-lucide="wine" className="w-4 h-4 text-emerald-800 opacity-90"></i><h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Bottle Pace</h3></div>
+                            <p className="text-xl font-extrabold text-emerald-900">{metrics.bottlesProjected.toFixed(2)}</p>
+                            <span className="text-[10px] font-medium text-gray-600 mt-0.5">Annual Pacing</span>
+                        </div>
+                        <div className="p-3 rounded-xl shadow-lg flex flex-col items-center justify-center bg-white/60 backdrop-blur-md text-gray-800 border border-opacity-40 border-white">
+                            <div className="flex items-center space-x-1 mb-1"><i data-lucide="calendar-check" className="w-4 h-4 text-emerald-800 opacity-90"></i><h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Total Consumed</h3></div>
+                            <p className="text-xl font-extrabold text-emerald-900">{metrics.totalDrinksConsumed}</p>
+                        </div>
                     </div>
                 </section>
                 
