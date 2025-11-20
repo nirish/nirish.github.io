@@ -23,7 +23,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 
-    <!-- Firebase v8 Compat -->
+    <!-- Firebase v8 (CORRECTED URLs - No "-compat") -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -33,6 +33,11 @@
             theme: {
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        'emerald-800': '#065f46',
+                        'emerald-600': '#059669',
+                        'amber-500': '#f59e0b',
+                    }
                 }
             }
         }
@@ -40,6 +45,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     <style>
         .lucide { width: 1em; height: 1em; display: inline-block; vertical-align: middle; }
+        /* Liquid Animation */
+        @keyframes wave { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @keyframes wave-slow { 0% { transform: translateX(-50%); } 100% { transform: translateX(0); } }
+        .animate-wave { animation: wave 12s linear infinite; }
+        .animate-wave-slow { animation: wave-slow 18s linear infinite; }
     </style>
 </head>
 <body class="bg-gray-50 font-sans">
@@ -57,16 +67,16 @@
     
     <!-- Firebase Config & Init -->
     <script>
- // --- Firebase Config (From your verified file) ---
-const firebaseConfig = {
-    apiKey: "AIzaSyD92lDT-pbCB-EmtnTaEUhyql-CCYsLhho",
-    authDomain: "dram-50c7c.firebaseapp.com",
-    projectId: "dram-50c7c",
-    storageBucket: "dram-50c7c.firebasestorage.app",
-    messagingSenderId: "645616473221",
-    appId: "1:645616473221:web:3a79dd9a2313f01bd0c5ec",
-    measurementId: "G-VL3RYR0YRD"
-};
+      // --- PASTE YOUR FIREBASE CONFIG HERE ---
+      const firebaseConfig = {
+        apiKey: "AIzaSyD92lDT-pbCB-EmtnTaEUhyql-CCYsLhho",
+        authDomain: "dram-50c7c.firebaseapp.com",
+        projectId: "dram-50c7c",
+        storageBucket: "dram-50c7c.firebasestorage.app",
+        messagingSenderId: "645616473221",
+        appId: "1:645616473221:web:3a79dd9a2313f01bd0c5ec",
+        measurementId: "G-VL3RYR0YRD"
+      };
       
       if (!firebase.apps.length) {
           firebase.initializeApp(firebaseConfig);
