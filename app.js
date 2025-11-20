@@ -1,14 +1,11 @@
-// --- 1. Paste the entire DrinkTracker.jsx code here ---
+// --- PASTE THIS INTO app.js ---
 
 const { useState, useEffect, useMemo, useCallback } = React;
 const { Wine, CalendarCheck, Zap, Goal, Flame, Calculator, ChevronDown, ChevronUp, Trash2, Minus, Plus, LogOut, User } = lucide;
-// We use global firebase object from index.html
 
 // --- Global Constants & Firebase Setup ---
-// NOTE: Config is handled in index.html, we just use the global instances
 const db = firebase.firestore();
 const auth = firebase.auth();
-// Use the App ID from your config or hardcode it if needed, but the logic below uses the auth user ID primarily.
 const appId = "dram-50c7c"; 
 
 // The base constants for your tracking goals
@@ -20,8 +17,9 @@ const BOTTLE_VOLUME_ML = 750;
 const DEFAULT_GOAL = 1.8;
 const BINGE_THRESHOLD = 4; // 4+ drinks is a binge
 
-// ... (ALL THE HELPER FUNCTIONS AND COMPONENTS GO HERE) ...
-// I will provide the full block below for copy-pasting.
+// ... (Rest of logic from previous successful step) ...
+// For brevity in this response, ensure you copy the full logic if you haven't already.
+// I will paste the full logic block below to be safe.
 
 const round = (num) => Math.round(num * 100) / 100;
 
@@ -70,12 +68,6 @@ const BackgroundLiquid = ({ percent }) => {
                      <WaveSvg fillClass="fill-amber-500" />
                 </div>
             </div>
-            <style>{`
-                @keyframes wave { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-                @keyframes wave-slow { 0% { transform: translateX(-50%); } 100% { transform: translateX(0); } }
-                .animate-wave { animation: wave 12s linear infinite; }
-                .animate-wave-slow { animation: wave-slow 18s linear infinite; }
-            `}</style>
         </div>
     );
 };
@@ -131,8 +123,8 @@ const useTrackerMetrics = (dailyLog, goalDrinksPerWeek) => {
             bottlesProjected = round((totalProjectedDrinks * DRINK_VOLUME_ML) / BOTTLE_VOLUME_ML);
         }
 
-        const percentOfGoal = totalGoalDrinks > 0 ? (trackingPeriodDrinks / totalGoalDrinks) * 100 : (trackingPeriodDrinks > 0 ? 100 : 0); 
-        const drinksReserve = totalGoalDrinks - trackingPeriodDrinks - sabbaticalExceptions;
+        const percentOfGoal = totalGoalDrinks > 0 ? (totalDrinksConsumed / totalGoalDrinks) * 100 : (totalDrinksConsumed > 0 ? 100 : 0); 
+        const drinksReserve = totalGoalDrinks - totalDrinksConsumed;
         
         return {
             totalGoalDrinks,
@@ -355,7 +347,7 @@ function App() {
                         <button onClick={handleSignOut} className="text-xs text-red-500 hover:text-red-700 mb-2 flex items-center p-1 rounded-full bg-white/50 backdrop-blur-sm shadow-sm"><LogOut className="w-3 h-3 mr-1" /> Sign Out</button>
                         <p className="text-xs text-emerald-900 font-semibold">{goalDrinksPerWeek.toFixed(2)} <span className="text-gray-700 font-normal">drinks/week</span></p>
                         <p className="text-xs text-emerald-900 font-semibold">{metrics.totalGoalDrinks} <span className="text-gray-700 font-normal">annual drinks</span></p>
-                        <p className="text-xs text-emerald-900 font-semibold">{Math.round(metrics.totalGoalBottles)} <span className="text-gray-700 font-normal">annual bottles</span></p>
+                        <p className="text-xs text-emerald-900 font-semibold">{metrics.totalGoalBottles.toFixed(2)} <span className="text-gray-700 font-normal">annual bottles</span></p>
                     </div>
                 </header>
 
