@@ -1,1 +1,8 @@
-
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.nirish.twa",
+        "sha256_cert_fingerprints": ["A2:00:97:10:E3:DE:76:B4:1B:B6:AD:DE:E4:33:92:D7:25:27:6C:82:49:29:E8:41:F9:82:D1:50:27:13:D3:00"]
+      }
+    }]
