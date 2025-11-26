@@ -3,7 +3,7 @@
     "short_name": "Dram Tracker",
     "description": "Track alcohol consumption against your annual goals and sabbatical period.",
     "start_url": ".",
-    "display": "standalone",
+    "display": "fullscreen",
     "background_color": "#065f46",
     "theme_color": "#065f46",
     "icons": [
