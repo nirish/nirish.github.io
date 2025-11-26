@@ -1,21 +1,21 @@
 {
-    "name": "Daily Dram Tracker",
-    "short_name": "Dram Tracker",
-    "description": "Track alcohol consumption against your annual goals and sabbatical period.",
-    "start_url": ".",
-    "display": "fullscreen",
-    "background_color": "#065f46",
-    "theme_color": "#065f46",
-    "icons": [
-        {
-            "src": "icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ]
+  "name": "Daily Dram Tracker",
+  "short_name": "Dram Tracker",
+  "description": "Track alcohol consumption against your annual goals and sabbatical period.",
+  "start_url": ".",
+  "display": "fullscreen",
+  "background_color": "#065f46",
+  "theme_color": "#065f46",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
