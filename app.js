@@ -446,26 +446,57 @@ function App() {
                 <section className="mb-20">
                     <h2 className="text-xl font-bold mb-4 text-emerald-900 drop-shadow-sm">Weekly Log</h2>
                     <div className="overflow-x-auto bg-white/70 backdrop-blur-md rounded-xl shadow-xl border border-emerald-100">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50/50">
-                                <tr><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th><th className="px-1 py-3 text-right text-xs font-numeric text-gray-500 uppercase w-px whitespace-nowrap">Drinks</th><th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Status</th></tr>
-                            </thead>
-                            <tbody className="bg-transparent divide-y divide-gray-200">
-                                {sortedWeeks.map((weekKey) => {
-                                    const week = pacedWeeklyData[weekKey];
-                                    const endDate = new Date(week.startDate); endDate.setUTCDate(week.startDate.getUTCDate() + 6);
-                                    const bingeEmoji = week.isBingeWeek ? '🔥 ' : '';
-                                    return (
-                                        <tr key={weekKey}>
-                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{week.isSabbatical ? `Sabbatical Wk ${week.calendarWeekNumber}` : `Wk ${week.calendarWeekNumber}`}</td>
-                                            <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500">{weekKey.slice(5)} - {formatDate(endDate).slice(5)}</td>
-                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-right"><span className={`font-bold ${week.color === 'red' ? 'text-red-600' : 'text-emerald-600'}`}>{week.totalDrinks}</span></td>
-                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-right"><span className={`text-xs font-medium px-2 py-1 rounded-full bg-${week.color}-100 text-${week.color}-800`}>{bingeEmoji}{week.status}</span></td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                      <table className="min-w-full divide-y divide-gray-200">
+    <thead className="bg-gray-50/50">
+        <tr>
+            {/* Combined Column */}
+            <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">
+                Week
+            </th>
+            {/* Tightened Padding + Shrink Width */}
+            <th className="px-1 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-px whitespace-nowrap">
+                Drk
+            </th>
+            <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+            </th>
+        </tr>
+    </thead>
+    <tbody className="bg-transparent divide-y divide-gray-200">
+        {sortedWeeks.map(weekKey => {
+            const week = pacedWeeklyData[weekKey];
+            const endDate = new Date(week.startDate); 
+            endDate.setUTCDate(week.startDate.getUTCDate() + 6);
+            
+            const bingeEmoji = week.isBingeWeek ? '🔥 ' : '';
+            const weekLabel = week.isSabbatical ? 'Sabbatical' : `Wk ${week.calendarWeekNumber}`;
+            const startStr = formatDate(week.startDate).slice(5).replace('-','/');
+            const endStr = formatDate(endDate).slice(5).replace('-','/');
+
+            return (
+                <tr key={weekKey}>
+                    {/* 1. Combined Week & Date Column */}
+                    <td className="px-2 py-3 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{weekLabel}</div>
+                        <div className="text-[10px] text-gray-500">{startStr}-{endStr}</div>
+                    </td>
+                    
+                    {/* 2. Centered, Compact Drinks Column */}
+                    <td className="px-1 py-3 whitespace-nowrap text-sm text-center font-bold text-emerald-600">
+                        {week.totalDrinks}
+                    </td>
+                    
+                    {/* 3. Status Column */}
+                    <td className="px-2 py-3 whitespace-nowrap text-sm text-right">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full bg-${week.color}-100 text-${week.color}-800`}>
+                            {bingeEmoji}{week.status}
+                        </span>
+                    </td>
+                </tr>
+            );
+        })}
+    </tbody>
+</table>
                     </div>
                 </section>
             </div>
