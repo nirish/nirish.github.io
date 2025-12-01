@@ -448,7 +448,7 @@ function App() {
                     <div className="overflow-x-auto bg-white/70 backdrop-blur-md rounded-xl shadow-xl border border-emerald-100">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50/50">
-                                <tr><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th><th className="px-3 py-3 text-right text-xs font-numeric text-gray-500 uppercase">Drinks</th><th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Status</th></tr>
+                                <tr><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th><th className="px-1 py-3 text-right text-xs font-numeric text-gray-500 uppercase">Drinks</th><th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Status</th></tr>
                             </thead>
                             <tbody className="bg-transparent divide-y divide-gray-200">
                                 {sortedWeeks.map((weekKey) => {
