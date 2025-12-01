@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "io.github.nirish.twa",
-        "sha256_cert_fingerprints": ["4A:5F:54:B2:A3:E1:CC:00:34:93:D5:CB:3E:82:7B:70:11:CF:95:8C:EB:0D:43:22:08:EA:5D:2E:E3:EF:95:02"]
+        "sha256_cert_fingerprints": ["E3:D0:05:D1:50:FC:C1:7B:02:6C:48:12:03:16:2B:FB:31:66:34:D9:FC:82:16:DB:9D:1A:89:51:0F:63:C0:A9"]
       }
     }]
